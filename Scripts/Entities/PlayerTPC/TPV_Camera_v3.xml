@@ -1,0 +1,38 @@
+<Graph Description="" Group="Third Person" enabled="1" MultiPlayer="ClientServer">
+ <Nodes>
+  <Node Id="1" Class="Game:Start" pos="-380,330,0" flags="0">
+   <Inputs InGame="1" InEditor="1"/>
+  </Node>
+  <Node Id="2" Class="FeatureTest:SimulateInput" pos="123.17767,80,0" flags="0">
+   <Inputs ActionInput="thirdperson" Value="0"/>
+  </Node>
+  <Node Id="3" Class="Debug:ConsoleVariable" pos="120,170,0" flags="0">
+   <Inputs CVar="cl_tpvDist" Value="-2.1"/>
+  </Node>
+  <Node Id="5" Class="Debug:ConsoleVariable" pos="122.29385,254.04108,0" flags="0">
+   <Inputs CVar="cl_tpvOffsetLeftRight" Value="0.5"/>
+  </Node>
+  <Node Id="6" Class="Debug:ConsoleVariable" pos="122.29385,334.04108,0" flags="0">
+   <Inputs CVar="cl_tpvOffsetUpDown" Value="0"/>
+  </Node>
+  <Node Id="11" Class="entity:SpawnPoint" pos="123.17767,0,0" flags="0">
+   <Inputs entityId="0" Disable="0" Enable="0" Spawn="0"/>
+  </Node>
+  <Node Id="15" Class="Debug:ConsoleVariable" pos="120,410,0" flags="0">
+   <Inputs CVar="cl_tpvYaw" Value="0"/>
+  </Node>
+  <Node Id="16" Class="Debug:ConsoleVariable" pos="120,490,0" flags="0">
+   <Inputs CVar="cl_tpvPitch" Value="0"/>
+  </Node>
+ </Nodes>
+ <Edges>
+  <Edge nodeIn="2" nodeOut="1" portIn="Press" portOut="output" enabled="1"/>
+  <Edge nodeIn="3" nodeOut="1" portIn="Set" portOut="output" enabled="1"/>
+  <Edge nodeIn="5" nodeOut="1" portIn="Set" portOut="output" enabled="1"/>
+  <Edge nodeIn="6" nodeOut="1" portIn="Set" portOut="output" enabled="1"/>
+  <Edge nodeIn="11" nodeOut="1" portIn="Spawn" portOut="output" enabled="1"/>
+  <Edge nodeIn="15" nodeOut="1" portIn="Set" portOut="output" enabled="1"/>
+  <Edge nodeIn="16" nodeOut="1" portIn="Set" portOut="output" enabled="1"/>
+ </Edges>
+ <GraphTokens />
+</Graph>

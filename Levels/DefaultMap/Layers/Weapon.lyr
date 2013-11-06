@@ -1,0 +1,5 @@
+<ObjectLayer>
+ <Layer Name="Weapon" GUID="{B9934064-7D50-4DE8-8DB6-125CCB985FC2}" FullName="Weapon" Hidden="0" Frozen="0" External="1" Exportable="1" ExportLayerPak="1" DefaultLoaded="0" HavePhysics="1" Expanded="0" IsDefaultColor="1" ID="0">
+  <LayerObjects />
+ </Layer>
+</ObjectLayer>

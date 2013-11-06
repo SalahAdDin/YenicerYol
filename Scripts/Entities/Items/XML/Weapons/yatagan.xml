@@ -1,0 +1,119 @@
+﻿<!--
+AYUDA:
+	Rifle.xml <- para el arco
+	http://docs.cryengine.com/display/SDKDOC5/Weapon+Scripts
+	http://docs.cryengine.com/display/SDKDOC4/Weapon+System
+-->
+
+<item name="Yatagan" class="Weapon" category="primary" priority="1" weaponParams="1">
+	<params>
+		<param name="selectable" value="1" />
+		<param name="droppable" value="1" />
+		<param name="giveable"  value="1" />
+		<param name="pickable" value="1" />
+		<!--<param name="usable" value="1" /> NO SE SI ES NECESARIO-->
+		<param name="giveable" value="1" />
+		<param name="mass"	value="1.2" />
+		<!--<param name="attach_to_back"	value="1" /> -->
+		<!--<param name="has_first_select"	value="1" /> Plays an animation when the weapon is selected for the first time (as with the LAW and its expanding tube) -->
+
+		<param name="pose" value="nw" /> <!-- Sets the pose the player model will use when holding the item -->
+		<param name="slidePose" value="nw" /> <!-- Sets the pose the player model will use when holding the item during a slide -->
+
+		<param name="melee_attack_firemode" value="melee" /> <!-- The name of the firemode that is used for melee combat while holding the weapon -->
+		<!--<param name="raiseable" value="true" /> 	DEPRECATED - Indicates whether the item can be raised when the player faces an object from up close. -->
+		<!--<param name="raise_distance" value="0.50" /> DEPRECATED - Sets how close the player has to be to an object for the weapon to be raised.-->
+
+		<param name="display_name" value="@mp_eYATAGAN" />
+		<param name="select_override" value="0.8" GAME="MP" />
+
+		<param name="bone_attachment_01" value="stow_primary1" />
+		<param name="bone_attachment_02" value="stow_primary2" />
+		<!-- Action Delays -->
+		<param name="sprintToFireDelay" value="0.1" GAME="SP" /> <!-- Time delay to prevent player from firing after sprinting stopped -->
+		<param name="sprintToFireDelay" value="0.05" GAME="MP" />
+		<param name="runToSprintBlendTime" value="0.3" />
+		<param name="sprintToRunBlendTime" value="0.4" GAME="SP" />
+		<param name="sprintToRunBlendTime" value="0.2" GAME="MP" />
+
+
+<!--
+		<dualwield>
+			<suffix value="akimbo_" />
+		</dualwield>
+-->
+
+	</params>
+
+<!--
+	<MovementModifiers speedScale="1.0" rotationScale="1.0" GAME="SP">
+		<Ironsight speedScale="0.6" rotationScale="0.33" mouseRotationScale="0.9" />  Altered movement scale when ironsight
+	</MovementModifiers>
+	<MovementModifiers speedScale="1.0" rotationScale="1.0" firingSpeedScale="1.0" GAME="MP">
+		<Ironsight speedScale="0.6" rotationScale="0.33" mouseRotationScale="0.9" />
+	</MovementModifiers>
+-->
+
+	<geometry>
+<!--		<firstperson name="Objects/weapons/rifle/rifle_fp.cdf" angles="0,0,0" position="0,0,0" />
+		<thirdperson name="Objects/weapons/rifle/rifle_tp.cgf" angles="0,0,0" useStreaming="0" GAME="MP"/>
+		<thirdperson name="Objects/weapons/rifle/rifle_tp.cgf" angles="0,0,0" GAME="SP"/>-->
+		<thirdperson name="Objects/Weapons/Kilic/Yatagan/yatagan.cgf" angles="0,0,0" useStreaming="0" GAME="MP"/>
+		<thirdperson name="Objects/Weapons/Kilic/Yatagan/yatagan.cgf" angles="0,0,0" GAME="SP"/>
+
+<!--		<thirdperson name="Objects/Weapons/Kilic/Yatagan/yatagan.cgf" angles="0,0,0" /> -->
+	</geometry>
+
+<!--
+
+actions:
+
+NO ESTAN EN RIFLE.XML
+Each action can be defined, given a custom animation, and sound effects. In fact you can give them multiple animations, and it’ll randomly pick from them. Worth noting though, that target=owner is the third person rig associated with the character (usually his visible shadow.) The other, target=firstperson should be obvious, it calls the arms to action.
+-->
+	<actions>
+		<action name="select">
+<!--			<animation target="firstperson" name="select_01" />-->
+			<animation target="owner" name="select" />
+<!--			<sound target="firstperson" name="sounds/weapons:punch:select_fp" radius="2" />-->
+			<sound target="thirdperson" name="sounds/weapons:punch:select_3p" radius="2" />
+		</action>
+		<action name="deselect">
+<!--			<animation target="firstperson" name="deselect_01" />-->
+<!--			<animation target="owner" name="deselect" />-->
+<!--			<sound target="firstperson" name="sounds/weapons:punch:deselect_fp" radius="2" />-->
+			<sound target="thirdperson" name="sounds/weapons:punch:deselect_3p" radius="2" />
+		</action>
+<!--		<action name="idle">-->
+<!--			<animation target="firstperson" name="idle_01" />-->
+<!--			<animation target="owner" name="melee_idle" />-->
+<!--		</action>-->
+		<action name="melee">
+<!--			<animation target="firstperson" name="strike_01" />-->
+<!--			<animation target="owner" name="melee_punch_right" />-->
+<!--			<sound target="firstperson" name="sounds/weapons:punch:fire_fp" radius="2" />-->
+			<sound target="thirdperson" name="sounds/weapons:punch:fire_3p" radius="2" />
+		</action>
+		<action name="hit">
+<!--			<sound target="firstperson" name="sounds/physics:bullets/impacts:melee_impact" radius="5" />-->
+			<sound target="thirdperson" name="sounds/physics:bullets/impacts:melee_impact" radius="5" />
+		</action>
+
+	</actions>
+	<firemodes>
+		<firemode name="melee" type="Melee">
+			<melee>
+				<param name="helper" value="collision" />
+				<param name="damage" value="80" />
+				<param name="impulse" value="200" />
+				<param name="delay" value="0.50" />
+				<param name="duration" value="0.85" />
+			</melee>
+<!--			
+			<actions>
+				<param name="attack" value="melee" />
+			</actions>
+-->
+		</firemode>
+	</firemodes>
+</item>
