@@ -9,6 +9,7 @@
 //  Description: 
 // -------------------------------------------------------------------------
 //  History:
+//	- 19:11:2013	Implements Enable/Disabled Crosshair in HUD
 //
 ////////////////////////////////////////////////////////////////////////////
 
@@ -59,6 +60,9 @@ void CUIHUD3D::InitEventSystem()
 	ICVar* pShowHudVar = gEnv->pConsole->GetCVar("hud_hide");
 	if (pShowHudVar)
 		pShowHudVar->SetOnChangeCallback( &OnVisCVarChange );
+	ICVar* pShowHudVarFlash = gEnv->pConsole->GetCVar("goc_Crosshair_Mode");//Enable and Disable Crosshair Mode
+		if (pShowHudVarFlash>0)
+		pShowHudVarFlash->SetOnChangeCallback( &OnVisCVarChange );
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -419,13 +423,17 @@ bool CUIHUD3D::IsVisible() const
 void CUIHUD3D::OnVisCVarChange( ICVar * )
 {
 	bool bVisible = g_pGame->GetUI()->GetCVars()->hud_hide == 0;
+	bool bVisible2 = true;
 
 	CUIHUD3D* pHud3D = UIEvents::Get<CUIHUD3D>();
 	if (pHud3D)
 		pHud3D->SetVisible( bVisible );
 
-	if (gEnv->pFlashUI)
-		gEnv->pFlashUI->SetHudElementsVisible(bVisible);
+	if (g_pGameCVars->goc_Crosshair_Mode>0)	//Detects enable/disable cross hair
+		bVisible2 =false;
+		if (gEnv->pFlashUI)
+			gEnv->pFlashUI->SetHudElementsVisible(bVisible2);
+
 }
 
 ////////////////////////////////////////////////////////////////////////////

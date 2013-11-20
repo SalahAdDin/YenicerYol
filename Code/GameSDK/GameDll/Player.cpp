@@ -10,6 +10,7 @@ History:
 - 29:9:2004: Created by Filippo De Luca
 - 04:11:2013	Implement Third Person Camera with Collission, tutorial by RodrigoMedeiros, GooFNK and berni
 				In this file Implements ThirdCameraPose new Method
+- 19:11:2013	Implement Fix for Thrid Person Actions
 
 *************************************************************************/
 #include "StdAfx.h"
@@ -418,7 +419,7 @@ CPlayer::CPlayer()
 , m_lastCameraLocation(IDENTITY)
 , m_lastReloadTime(0.f)
 , m_teamWhenKilled(-1)
-,m_tpvAimTarget()	//Add new tpv variable
+, m_tpvAimTarget()
 #if ENABLE_RMI_BENCHMARK
 , m_RMIBenchmarkLast( 0 )
 , m_RMIBenchmarkSeq( 0 )
@@ -2118,66 +2119,116 @@ void CPlayer::SetIK( const SActorFrameMovementParams& frameMovementParams )
 
 	bool allowAimIK = IsPlayer();
 
-	if (allowAimIK)	//Fix AIM bug with Third Camera Person
+	if (allowAimIK)
 	{
-		if (IsThirdPerson()) 
-		{
-			 float WeaponMaxDist = g_pGameCVars->cl_tpvMaxWeapDist; //This variable in the Cvars dictates weapon and raycast max range, weapon will shoot further but without a raycast hit it will be inacurate
-			 Vec3 pos = curMovementState.weaponPosition;
-			 Matrix34 ViewRotation = GetViewMatrix();
-			 const Matrix34& clientPlayerTM = GetEntity()->GetWorldTM();
-			 Vec3 PlayerPos = clientPlayerTM.GetTranslation();
+		//aimTarget = curMovementState.eyePosition + curMovementState.aimDirection * 5.0f; // If this is too close the aiming will fade out.
+		//CWeapon *pWeapon = GetWeapon(GetCurrentItemId());
+		//aimEnabled = !IsSprinting() || (pWeapon && pWeapon->IsReloading());
 
-			 Vec3 DistanceVec = ViewRotation.GetColumn1() * -g_pGameCVars->cl_tpvDist;
-			 Vec3 DistanceLeftRight = ViewRotation.GetColumn0() * g_pGameCVars->cl_tpvOffsetLeftRight;
-			 Vec3 DistanceUpDown = ViewRotation.GetColumn2() * g_pGameCVars->cl_tpvOffsetUpDown;
-			 Vec3 stanceViewOffset = GetBaseQuat() * GetStanceViewOffset(GetStance());
+	if (IsThirdPerson())
+   	   {
+         float WeaponMaxDist = g_pGameCVars->cl_tpvMaxWeapDist/3; //This variable in the Cvars dictates weapon and raycast max range, weapon will shoot further but without a raycast hit it will be inacurate
+         Vec3 pos = curMovementState.weaponPosition;
+         Matrix34 ViewRotation = GetViewMatrix();
+         const Matrix34& clientPlayerTM = GetEntity()->GetWorldTM();
+         Vec3 PlayerPos = clientPlayerTM.GetTranslation();
+
+         Vec3 DistanceVec = ViewRotation.GetColumn1() * -g_pGameCVars->cl_tpvDist;
+         Vec3 DistanceLeftRight = ViewRotation.GetColumn0() * g_pGameCVars->cl_tpvOffsetLeftRight;
+         Vec3 DistanceUpDown = ViewRotation.GetColumn2() * g_pGameCVars->cl_tpvOffsetUpDown;
+         Vec3 stanceViewOffset = GetBaseQuat() * GetStanceViewOffset(GetStance());
          
-			 Vec3 CameraPos = clientPlayerTM.GetTranslation() + DistanceVec + stanceViewOffset + DistanceLeftRight + DistanceUpDown;
-			 Vec3 CameraPosRay = clientPlayerTM.GetTranslation() + stanceViewOffset + DistanceLeftRight + DistanceUpDown;
-			 Vec3 CameraPosEnd = clientPlayerTM.GetTranslation() + DistanceVec + stanceViewOffset + DistanceLeftRight + DistanceUpDown + (curMovementState.aimDirection * WeaponMaxDist);
+         Vec3 CameraPos = clientPlayerTM.GetTranslation() + DistanceVec + stanceViewOffset + DistanceLeftRight + DistanceUpDown;
+         Vec3 CameraPosRay = clientPlayerTM.GetTranslation() + stanceViewOffset + DistanceLeftRight + DistanceUpDown;
+         Vec3 CameraPosEnd = clientPlayerTM.GetTranslation() + DistanceVec + stanceViewOffset + DistanceLeftRight + DistanceUpDown + (curMovementState.aimDirection * WeaponMaxDist);
 
-			 Vec3 CameraAimNorm = ((CameraPosEnd-CameraPosRay).normalize()*WeaponMaxDist);         
+         Vec3 CameraAimNorm = ((CameraPosEnd-CameraPosRay).normalize()*WeaponMaxDist);         
 
-			 //RAYCAST to get the distance and hitpoint of any object it collides with
-			 static PhysSkipList skipList;
-			 skipList.clear();
-			 static ray_hit hit;   
-			 uint32 flags= rwi_colltype_any(geom_collides)|rwi_force_pierceable_noncoll|rwi_stop_at_pierceable;
-			 IPhysicalEntity* skipEnts[1];
-			 skipEnts[0] = pEntity->GetPhysics();      
-			 gEnv->pPhysicalWorld->RayWorldIntersection(CameraPosRay, CameraAimNorm, ent_all, flags, &hit, 1, skipEnts, 1);
+         //RAYCAST to get the distance and hitpoint of any object it collides with
+         static PhysSkipList skipList;
+         skipList.clear();
+         static ray_hit hit;   
+         uint32 flags= rwi_colltype_any(geom_collides)|rwi_force_pierceable_noncoll|rwi_stop_at_pierceable;
+         IPhysicalEntity* skipEnts[1];
+         skipEnts[0] = pEntity->GetPhysics();      
+         gEnv->pPhysicalWorld->RayWorldIntersection(CameraPosRay, CameraAimNorm, ent_all, flags, &hit, 1, skipEnts, 1);
+		if (g_pGameCVars->goc_Crosshair_Mode==1)
+		        {		
+						CPlayer* pPlayerWeap = static_cast<CPlayer*>(g_pGame->GetIGameFramework()->GetClientActor());
+						CItem* pCurrentWeapon = static_cast<CItem*>(pPlayerWeap->GetCurrentItem());
+						if (pCurrentWeapon && pPlayerWeap->CanFire() && pCurrentWeapon->IsSelected() && !pCurrentWeapon->IsDeselecting())
+						{
+						Vec3 posi = pCurrentWeapon->GetSlotHelperPos(eIGS_ThirdPerson, "weapon_term", true);
+						Matrix33 rotation = pCurrentWeapon->GetSlotHelperRotation(eIGS_ThirdPerson, "weapon_term", true);
+						float crossX=fabs(fabs(hit.pt.x)-fabs(posi.x));
+						float crossY=fabs(fabs(hit.pt.y)-fabs(posi.y));
+						if (crossX<0.6f || crossY<0.6f)
+							{ 
+							crossX=3.0f;
+							crossY=3.0f;
+							}
+						float sizeCross=(crossX+crossY)/(g_pGameCVars->cl_tpvMaxWeapDist/4.0f);
+						//CryWatch("Hit x: %f  Hit y: %f   Hit z: %f --- Posi x: %f  Posi y: %f  Posi z: %f  === Total: X %f  Y %f", hit.pt.x, hit.pt.y, hit.pt.z, posi.x, posi.y, posi.z, fabs(fabs(hit.pt.x)-fabs(posi.x)), fabs(fabs(hit.pt.y)-fabs(posi.y)));
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(posi,ColorB(128, 128, 128, 0),hit.pt,ColorB(128, 128, 128, 60),1.0f);
+						/*gEnv->pRenderer->GetIRenderAuxGeom()->DrawCone(hit.pt, Vec3(0,-1,0), 0.1f, 0.15f, ColorB(128, 200, 128, 10),1);
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawCone(hit.pt, Vec3(0,1,0), 0.1f, 0.15f, ColorB(128, 200, 128, 10),1);
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawCone(hit.pt, Vec3(1,0,0), 0.1f, 0.15f, ColorB(128, 200, 128, 10),1);
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawCone(hit.pt, Vec3(-1,0,0), 0.1f, 0.15f, ColorB(128, 200, 128, 10),1);
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawCone(hit.pt, Vec3(0,0,1), 0.1f, 0.15f, ColorB(128, 200, 128, 10),1);
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawCone(hit.pt, Vec3(0,0,-1), 0.1f, 0.15f, ColorB(128, 200, 128, 10),1);*/
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawSphere(hit.pt, sizeCross/2.0f, ColorB(127, 127, 255, 100),0);
+						/*gEnv->pRenderer->GetIRenderAuxGeom()->DrawSphere(hit.pt+Vec3(0,0.2,0), 0.075f, ColorB(255, 255, 255, 80),1);						
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawSphere(hit.pt+Vec3(0,-0.2,0), 0.075f, ColorB(255, 255, 255, 80),1);						
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawSphere(hit.pt+Vec3(0.2,0,0), 0.075f, ColorB(255, 255, 255, 80),1);
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawSphere(hit.pt+Vec3(-0.2,0,0), 0.075f, ColorB(255, 255, 255, 80),1);
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawSphere(hit.pt+Vec3(0,0,0.2), 0.075f, ColorB(255, 255, 255, 80),1);
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawSphere(hit.pt+Vec3(0,0,-0.2), 0.075f, ColorB(255, 255, 255, 80),1);*/						
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(0,sizeCross*1.5f,0),ColorB(255, 255, 255, 100),9.0f);
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(0,-sizeCross*1.5f,0),ColorB(255, 255, 255, 100),9.0f);
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(sizeCross*1.5f,0,0),ColorB(255, 255, 255, 100),9.0f);
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(-sizeCross*1.5f,0,0),ColorB(255, 255, 255, 100),9.0f);
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(0,0,sizeCross*1.5f),ColorB(255, 255, 255, 100),9.0f);
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(0,0,-sizeCross*1.5f),ColorB(255, 255, 255, 100),9.0f);
+						/*gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(0.3,0.3,0),ColorB(255, 128, 128, 60),7.0f);
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(-0.3,-0.3,0),ColorB(255, 128, 128, 60),7.0f);
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(0.3,0,0.3),ColorB(255, 128, 128, 60),7.0f);
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(-0.3,0,-0.3),ColorB(255, 128, 128, 60),7.0f);
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(0,0.3,0.3),ColorB(255, 128, 128, 60),7.0f);
+						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(0,-0.3,-0.3),ColorB(255, 128, 128, 60),7.0f);*/
+						}
+				}
+		
+         if (g_pGameCVars->cl_tpvMaxWeapDistDebug == 1)
+         {
+            gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(pos,ColorB(255, 128, 128, 255),hit.pt,ColorB(255, 128, 128, 255),1.0f);
+            gEnv->pRenderer->GetIRenderAuxGeom()->DrawSphere(hit.pt, 0.125f, ColorB(255, 128, 128, 255));
+         }
 
-			 if (g_pGameCVars->cl_tpvMaxWeapDistDebug == 1)
-			 {
-				 gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(pos,ColorB(255, 128, 128, 255),hit.pt,ColorB(255, 128, 128, 255),1.0f);
-				 gEnv->pRenderer->GetIRenderAuxGeom()->DrawSphere(hit.pt, 0.125f, ColorB(255, 128, 128, 255));
-			 }
+         if (hit.dist < 0)
+         {
+            aimTarget = clientPlayerTM.GetTranslation() + stanceViewOffset + DistanceVec + DistanceLeftRight + DistanceUpDown + curMovementState.aimDirection * WeaponMaxDist;
+         }
+         else
+         {
+            aimTarget = hit.pt;
+         }
 
-			 if (hit.dist < 0)
-			 {
-				aimTarget = clientPlayerTM.GetTranslation() + stanceViewOffset + DistanceVec + DistanceLeftRight + DistanceUpDown + curMovementState.aimDirection * WeaponMaxDist;
-			 }
-			 else
-			 {
-				aimTarget = hit.pt;
-			 }
-
-			 CWeapon *pWeapon = GetWeapon(GetCurrentItemId());
-			 aimEnabled = !IsSprinting() || (pWeapon && pWeapon->IsReloading());
-			 Vec3 NormAimTarget = aimTarget;
+         CWeapon *pWeapon = GetWeapon(GetCurrentItemId());
+         aimEnabled = !IsSprinting() || (pWeapon && pWeapon->IsReloading());
+         Vec3 NormAimTarget = aimTarget;
          
-			 IActor *pActor = gEnv->pGame->GetIGameFramework()->GetClientActor();
-			 IMovementController * pMC = pActor ? pActor->GetMovementController() : 0;
+         IActor *pActor = gEnv->pGame->GetIGameFramework()->GetClientActor();
+         IMovementController * pMC = pActor ? pActor->GetMovementController() : 0;
 
-			 m_tpvAimTarget = (NormAimTarget-pos).normalized();//assign the normalized value to the accessible table for passing to Single.cpp
-		}
-		else
-		{
-			 aimTarget = curMovementState.eyePosition+ curMovementState.aimDirection * 5.0f; // If this is too close the aiming will fade out.
-			 CWeapon *pWeapon = GetWeapon(GetCurrentItemId());
-			 aimEnabled = !IsSprinting() || (pWeapon && pWeapon->IsReloading());
-		}
+         m_tpvAimTarget = (NormAimTarget-pos).normalized();//assign the normalized value to the accessible table for passing to Single.cpp
+     	 }
+     	 else
+     	 {
+         aimTarget = curMovementState.eyePosition+ curMovementState.aimDirection * 5.0f; // If this is too close the aiming will fade out.
+         CWeapon *pWeapon = GetWeapon(GetCurrentItemId());
+         aimEnabled = !IsSprinting() || (pWeapon && pWeapon->IsReloading());
+    	  }
+
 
 	}
 	else if (!aimEnabled)
@@ -3080,7 +3131,39 @@ void CPlayer::RefreshVisibilityState()
 //-----------------------------------------------------------------------------
 void CPlayer::ToggleThirdPerson()
 {
-	SetThirdPerson(!m_stats.isThirdPerson);
+	ICVar* enablethird = gEnv->pConsole->GetCVar("goc_CameraMode");
+	ICVar* enablecross = gEnv->pConsole->GetCVar("goc_Crosshair_Mode");
+
+
+	int AlternateThird;
+	AlternateThird=g_pGameCVars->goc_CameraMode;
+	AlternateThird++;
+	if (AlternateThird>3)
+		AlternateThird=0;
+	switch (AlternateThird)
+	{
+		case 0:
+		SetThirdPerson(false);
+		enablethird->Set(0);
+		enablecross->Set(0);
+		break;
+		case 1:
+		SetThirdPerson(true);
+		enablethird->Set(1);
+		enablecross->Set(1);
+		break;
+		case 2:
+		SetThirdPerson(true);
+		enablethird->Set(2);
+		enablecross->Set(1);
+		break;
+		case 3:
+		SetThirdPerson(true);
+		enablethird->Set(3);
+		enablecross->Set(1);
+		break;
+	}
+	
 }
 
 void CPlayer::SetThirdPerson(bool thirdPersonEnabled)
@@ -10263,4 +10346,3 @@ void CPlayer::RMIBenchmarkCallback( ERMIBenchmarkLogPoint point0, ERMIBenchmarkL
 }
 
 #endif
-

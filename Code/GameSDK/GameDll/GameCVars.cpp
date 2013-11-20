@@ -10,6 +10,7 @@ History:
 - 11:8:2004   10:50 : Created by Márcio Martins
 - 04:11:2013	Implement Third Person Camera with Collission, tutorial by RodrigoMedeiros, GooFNK and berni
 				In this file Implements ThirdCameraPose new Method
+- 19:11:2013	Implements Other Camera Modes Variables and Actions for TP Camera in Player variables
 
 *************************************************************************/
 #include "StdAfx.h"
@@ -576,15 +577,21 @@ void SCVars::InitCVars(IConsole *pConsole)
 #if !defined(XENON) && !defined(PS3)
 	REGISTER_CVAR_CB(cl_mp_fov_scalar, 1.f, 0, "field of view scale (multiplayer)", OnFOVMPChanged);
 #endif
-	REGISTER_CVAR(cl_tpvDist, 3.5f, 0, "camera distance in 3rd person view");
-	//Register new CVars for third person camera
-	REGISTER_CVAR(cl_tpvDistLedge, 1.5f, 0, "Distance LedGeGrabbing in 3rd person view");
-	REGISTER_CVAR(cl_tpvOffsetLeftRight, 0, 0, "camera position offset in 3rd person view");
-	REGISTER_CVAR(cl_tpvOffsetUpDown, 0, 0, "camera position offset in 3rd person view");
-	REGISTER_CVAR(cl_tpvPitch, 0, 0, "camera vertical angle offset in 3rd person view");
+	REGISTER_CVAR(cl_tpvDist, -2.5f, 0, "camera distance in 3rd person view. Like goc_targety");
+	REGISTER_CVAR(goc_RTS_Distance, 5.0f, VF_NULL , "RTS Top Distance");
+	REGISTER_CVAR(goc_RTS_Mouse_Character, 0, 0, "Determines whether the mouse controls the character instead of the camera");
+	REGISTER_CVAR(goc_Player_Rotation_Speed, 6.0f, 0, "Determines the smooth rotation of the character in the third person");
+	REGISTER_CVAR(goc_RTS_Pitch, 0.2f, 0, "Pitch Camera in RTS Mode");
+	REGISTER_CVAR(cl_tpvOffsetLeftRight, 0.5f, 0, "x offset camera distance in 3rd person view. Like goc_targetx");
+	REGISTER_CVAR(cl_tpvOffsetUpDown, -0.1f, 0, "y offset camera distance in 3rd person view. Like goc_targetz");
+	REGISTER_CVAR(goc_Crosshair_Mode, VF_NULL, 0, "Crosshair Default = 0 - New Crosshair = 1 - No Crosshair = 2");
+	REGISTER_CVAR(cl_nearPlane, 0.011f, 0, "near clip plane camera in 3rd person view");
+	REGISTER_CVAR(cl_tpvDistLedge, 1.0f, 0, "Distance in y coordinate in 3rd person view");
 	REGISTER_CVAR(cl_tpvMaxWeapDist, 250.0f, 0, "Max Weapon dist affects the also set max dist for Raycast weapon accuracy");
-	REGISTER_CVAR(cl_tpvMaxWeapDistDebug, 0, 0, "Turn on the debug visualization for the Ray and corresponding hit point");
-	//
+   	REGISTER_CVAR(cl_tpvMaxWeapDistDebug, 0, 0, "Turn on the debug visualization for the Ray and corresponding hit point");
+	REGISTER_CVAR(goc_CameraMode, 0 , 0 , "First Person = 0 - Third Person = 1 - FreeMode = 2 - RTS Mode = 3" );
+
+
 	REGISTER_CVAR(cl_tpvYaw, 0, 0, "camera angle offset in 3rd person view");
 	REGISTER_CVAR(cl_sensitivity, 30.0f, VF_DUMPTODISK, "Set mouse sensitivity!");
 	REGISTER_CVAR(cl_sensitivityController, 0.8f, VF_DUMPTODISK, "Set controller sensitivity! Expecting 0.0f to 2.0f");
@@ -2101,14 +2108,21 @@ void SCVars::ReleaseCVars()
 
 	pConsole->UnregisterVariable("cl_fov", true);
 	pConsole->UnregisterVariable("cl_tpvDist", true);
-	//Add new CVars for third person camera
-	pConsole->UnregisterVariable("cl_tpvDistLedge", true);
+	pConsole->UnregisterVariable("goc_RTS_Distance", true);
+	pConsole->UnregisterVariable("goc_RTS_Mouse_Character", true);
+	pConsole->UnregisterVariable("goc_Player_Rotation_Speed", true);
+	pConsole->UnregisterVariable("goc_RTS_Pitch", true);
 	pConsole->UnregisterVariable("cl_tpvOffsetLeftRight", true);
 	pConsole->UnregisterVariable("cl_tpvOffsetUpDown", true);
-	pConsole->UnregisterVariable("cl_tpvPitch", true);
+	pConsole->UnregisterVariable("goc_Crosshair_Mode", true);
+	pConsole->UnregisterVariable("goc_CameraMode",true);
+
+	pConsole->UnregisterVariable("cl_nearPlane", true);
+	pConsole->UnregisterVariable("cl_tpvDistLedge", true);
 	pConsole->UnregisterVariable("cl_tpvMaxWeapDist", true);
-	pConsole->UnregisterVariable("cl_tpvMaxWeapDistDebug", true);
-	//
+   	pConsole->UnregisterVariable("cl_tpvMaxWeapDistDebug", true);
+
+
 	pConsole->UnregisterVariable("cl_tpvYaw", true);
 	pConsole->UnregisterVariable("cl_sensitivity", true);
 	pConsole->UnregisterVariable("cl_sensitivityController", true);

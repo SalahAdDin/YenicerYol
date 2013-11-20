@@ -9,6 +9,7 @@ Description: Utility functions for the playerstate
 -------------------------------------------------------------------------
 History:
 - 14.10.10: Created by Stephen M. North
+- 19.11.2013:	Implements player Rotation in Free Camera(I believe this)
 
 *************************************************************************/
 #include "StdAfx.h"
@@ -387,16 +388,128 @@ void CPlayerStateUtil::UpdatePlayerPhysicsStats( CPlayer& player, SActorPhysics&
 
 void CPlayerStateUtil::ProcessTurning( CPlayer& player, float frameTime )
 {
-	const Quat entityRot = player.GetEntity()->GetWorldRotation().GetNormalized();
-	const Quat inverseEntityRot = entityRot.GetInverted();
+	if (player.m_stats.isRagDoll || player.m_stats.isGrabbed /*&& !m_player.IsPlayer()*/)
+		return;
 
+    bool limitLegs = false;
+    bool ROTATION_AFFECTS_THIRD_PERSON_MODEL = ( (player.m_actions & ACTION_MOVE) || !player.IsThirdPerson() || player.m_stats.inFiring ) ? true : false;
+   float ROTATION_SPEED = g_pGameCVars->goc_Player_Rotation_Speed;
+
+//	const bool ROTATION_AFFECTS_THIRD_PERSON_MODEL = true;
+//	static const float ROTATION_SPEED = 23.3f;
+
+    if ( player.IsThirdPerson() && g_pGameCVars->goc_CameraMode==2 )
+    {
+        EntityId itemId = player.GetInventory()->GetCurrentItem();
+       if (itemId)
+       {
+          if( CItem* item = player.GetItem(itemId) )
+            {
+                if( IWeapon* weapon = item->GetIWeapon() )
+                {
+                    if ( weapon->IsZoomed() || weapon->IsZoomingInOrOut() || player.m_stats.inFiring )
+                    {
+                        ROTATION_AFFECTS_THIRD_PERSON_MODEL = true;
+                        limitLegs = true;
+                    }
+                }
+            }
+        }   
+   }
+
+	Quat entityRot = player.GetEntity()->GetWorldRotation().GetNormalized();
+	Quat inverseEntityRot = entityRot.GetInverted();
 	const Quat baseQuat = player.GetBaseQuat();
 	SCharacterMoveRequest& request = player.GetMoveRequest();
+	const bool isinZeroG = player.GetActorPhysics().velocity*player.GetActorPhysics().gravity<=0.0001f;
+	
 
-	request.rotation = inverseEntityRot * baseQuat;
-	request.rotation.Normalize();
-}
+	// TODO: figure out a way to unify this
+	if (player.IsThirdPerson()  && g_pGameCVars->goc_CameraMode>=2)
+	{
+		
+		Quat m_turnTarget;
+		m_turnTarget = player.GetEntity()->GetRotation();
+		Vec3 right = m_turnTarget.GetColumn0();
+		Vec3 up = baseQuat.GetColumn2().GetNormalized();
+		Vec3 forward = (up % right).GetNormalized();
+		m_turnTarget = Quat( Matrix33::CreateFromVectors(forward%up, forward, up) );
 
+		if (ROTATION_AFFECTS_THIRD_PERSON_MODEL)
+		{
+			if (player.m_stats.inAir && isinZeroG)
+			{
+				m_turnTarget = baseQuat;
+				request.rotation = inverseEntityRot * m_turnTarget;
+			}
+            		else if ( !player.m_stats.isThirdPerson )
+            			{
+                		request.rotation = inverseEntityRot * baseQuat;
+            			request.rotation.Normalize();
+            			}
+			else
+			{
+
+                m_turnTarget = baseQuat;		 
+                uint32 moveState = player.GetPlayerInput()->GetMoveButtonsState();
+            	float turn = 0.0f; //m_player.GetAngles().z;//m_movement.deltaAngles.z;
+
+                float fAddRot = 0.f;
+                float scale = (limitLegs) ? 0.5f : 1.0f;
+
+                if ( moveState & CPlayerInput::eMBM_Back && !limitLegs )
+                {
+                    if ( moveState & CPlayerInput::eMBM_Forward )
+                        return;
+						
+                    fAddRot = gf_PI;
+
+                    if ( moveState & CPlayerInput::eMBM_Left )
+                        fAddRot -= gf_PI/4;
+                    if ( moveState & CPlayerInput::eMBM_Right )
+                        fAddRot += gf_PI/4;
+                }
+                if ( moveState & CPlayerInput::eMBM_Forward )
+                {
+                    fAddRot = 0.f;
+
+                    if ( moveState & CPlayerInput::eMBM_Left )
+                        fAddRot += gf_PI/4;
+                    if ( moveState & CPlayerInput::eMBM_Right )
+                        fAddRot -= gf_PI/4;
+                }
+                if ( !( moveState & CPlayerInput::eMBM_Forward ) && !( moveState & CPlayerInput::eMBM_Back ) )
+                {
+                    if ( moveState & CPlayerInput::eMBM_Left )
+                    {
+                        if ( moveState & CPlayerInput::eMBM_Right )
+                            return;
+
+                        fAddRot += (gf_PI/2)*scale;
+                    }
+                    if ( moveState & CPlayerInput::eMBM_Right )
+                        fAddRot -= (gf_PI/2)*scale;
+                }
+                m_turnTarget = Quat::CreateRotationZ(turn) * m_turnTarget;
+                m_turnTarget *= Quat::CreateRotationZ(fAddRot);
+				Quat turnQuat = inverseEntityRot * m_turnTarget;
+            
+				float turnAngle = cry_acosf( CLAMP( FORWARD_DIRECTION.Dot(turn * FORWARD_DIRECTION), -1.0f, 1.0f ) );
+				float turnRatio = turnAngle / (ROTATION_SPEED * frameTime);
+            if (turnRatio > 1)
+               turnQuat = Quat::CreateSlerp( Quat::CreateIdentity(), turnQuat, 1.0f/turnRatio );
+				request.rotation = turnQuat;
+			}
+		}
+	}
+	else
+	{
+
+		request.rotation = inverseEntityRot * baseQuat;
+		request.rotation.Normalize();
+   	}
+
+ }
 
 void CPlayerStateUtil::InitializeMoveRequest( SCharacterMoveRequest& frameRequest )
 {
@@ -581,7 +694,6 @@ bool CPlayerStateUtil::ShouldSprint( const CPlayer& player, const SActorFrameMov
 	return shouldSprint;
 }
 
-
 void CPlayerStateUtil::ApplyFallDamage( CPlayer& player, const float startFallingHeight, const float fHeightofEntity )
 {
 	CRY_ASSERT(player.IsClient());
@@ -683,7 +795,6 @@ void CPlayerStateUtil::CancelCrouchAndProneInputs(CPlayer & player)
 		playerInput->ClearProneAction();
 	}
 }
-
 
 void CPlayerStateUtil::ChangeStance( CPlayer& player, const SStateEvent& event )
 {

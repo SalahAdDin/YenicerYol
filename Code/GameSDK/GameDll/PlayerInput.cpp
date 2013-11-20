@@ -5,6 +5,7 @@ Copyright (C), Crytek Studios, 2001-2010.
 -------------------------------------------------------------------------
 History:
   October 2010 : Jens Schöbel added move overlay
+  -19.11.2013:	Implements Move Actions for TP Camera by berni 
 
 *************************************************************************/
 
@@ -247,9 +248,19 @@ void CPlayerInput::DisableXI(bool disabled)
 //////////////////////////////////////////////////////////////////////////
 void CPlayerInput::ApplyMovement(Vec3 delta)
 {
-  m_deltaMovement.x = clamp_tpl(m_deltaMovement.x+delta.x,-1.0f,1.0f);
-  m_deltaMovement.y = clamp_tpl(m_deltaMovement.y+delta.y,-1.0f,1.0f);
-  m_deltaMovement.z = 0;
+	if ( g_pGameCVars->goc_CameraMode>=2)	//Implements Movement Actions for TP Camera
+		{
+		Vec3 delta2= Vec3(0,1,0);
+		m_deltaMovement.x = clamp_tpl(m_deltaMovement.x+delta2.x,-1.0f,1.0f);
+		m_deltaMovement.y = clamp_tpl(m_deltaMovement.y+delta2.y,-1.0f,1.0f);
+		m_deltaMovement.z = 0;
+		}
+		else
+		{
+		m_deltaMovement.x = clamp_tpl(m_deltaMovement.x+delta.x,-1.0f,1.0f);
+		m_deltaMovement.y = clamp_tpl(m_deltaMovement.y+delta.y,-1.0f,1.0f);
+		m_deltaMovement.z = 0;
+		}
 }
 
 //////////////////////////////////////////////////////////////////////////

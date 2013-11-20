@@ -376,12 +376,22 @@ struct SCVars
 	float cl_mp_fov_scalar;
 #endif
 	float cl_tpvDist;
-	float cl_tpvDistLedge;
+	float goc_RTS_Distance;	
+	int goc_RTS_Mouse_Character;
+	float goc_Player_Rotation_Speed;
+	float goc_RTS_Pitch;
 	float cl_tpvOffsetLeftRight;
 	float cl_tpvOffsetUpDown;
-	float cl_tpvPitch;
-	float cl_tpvMaxWeapDist;
-	int cl_tpvMaxWeapDistDebug;
+	int flash_croshair_enable;
+	int goc_CameraMode ;
+	int goc_Crosshair_Mode;
+
+	float cl_nearPlane;
+	float cl_tpvDistLedge;
+   	float cl_tpvMaxWeapDist;
+   	int cl_tpvMaxWeapDistDebug;
+
+
 	float cl_tpvYaw;
 	float cl_sensitivity;
 	float cl_sensitivityController;

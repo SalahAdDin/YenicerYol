@@ -1204,20 +1204,24 @@ Vec3 CSingle::GetProbableHit(float maxRayLength, bool *pbHit, ray_hit *pHit) con
 		}
 		else
 		{
-			CPlayer *pPlayer = static_cast<CPlayer *>(g_pGame->GetIGameFramework()->GetClientActor());
-			bool ThirdPerson = pPlayer->IsThirdPerson();
+			//dir = info.fireDirection;
+			//requiresProbableHitTest = true; // Only players use probably hit info, AI uses fire target always
 
-			if (ThirdPerson == 1)
-			{      
-				Vec3 AimTarget = pPlayer->m_tpvAimTarget;
-				dir = AimTarget;
-				requiresProbableHitTest = true; // Only players use probably hit info, AI uses fire target always
-			}
-			else
-			{
-				dir = info.fireDirection;
-				requiresProbableHitTest = true; // Only players use probably hit info, AI uses fire target always
-			}
+		    CPlayer *pPlayer = static_cast<CPlayer *>(g_pGame->GetIGameFramework()->GetClientActor());
+     		    bool ThirdPerson = pPlayer->IsThirdPerson();
+
+     		    if (ThirdPerson == 1)
+    		     {      
+    		        Vec3 AimTarget = pPlayer->m_tpvAimTarget;
+    		        dir = AimTarget;
+   		        requiresProbableHitTest = true; // Only players use probably hit info, AI uses fire target always
+   		      }
+   		      else
+   		      {
+   		         dir = info.fireDirection;
+           		 requiresProbableHitTest = true; // Only players use probably hit info, AI uses fire target always
+       			}
+
 		}
 
 		CRY_ASSERT(dir.IsUnit());
