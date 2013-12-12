@@ -9,7 +9,7 @@ Description: Camera mode implementations
 -------------------------------------------------------------------------
 History:
 - 16:10:2009   Created by Benito Gangoso Rodriguez
-
+- 09:12:2013   Implements a enum type var for different Camera Modes
 *************************************************************************/
 
 #pragma once
@@ -22,6 +22,19 @@ History:
 struct SPlayerStats;
 struct SDeathCamSPParams;
 struct IItem;
+
+// Modes for the third person camera.
+
+enum EThirdPersonViewMode
+{
+	eTPVM_FPS = 0,
+	eTPVM_Follow,
+	eTPVM_Orbit,
+	eTPVM_NearPlayer,
+	eTPVM_RTS,
+	eTPVM_SideScroll,
+	eTPVM_Kite
+};
 
 
 

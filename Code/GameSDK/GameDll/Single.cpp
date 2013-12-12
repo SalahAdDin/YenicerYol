@@ -10,6 +10,7 @@ History:
 - 11:9:2005   15:00 : Created by Márcio Martins
 - 04:11:2013	Implement Third Person Camera with Collission, tutorial by RodrigoMedeiros, GooFNK and berni
 				In this file Implements ThirdCameraPose new Method
+- 09:12:2013	Better Aiming
 
 *************************************************************************/
 #include "StdAfx.h"
@@ -1198,14 +1199,14 @@ Vec3 CSingle::GetProbableHit(float maxRayLength, bool *pbHit, ray_hit *pHit) con
 
 		pos = info.weaponPosition;
 
-		if (!pActor->IsPlayer())
+	if (!pActor->IsPlayer())
 		{
 			dir = (info.fireTarget-pos).normalized();
 		}
 		else
 		{
 			//dir = info.fireDirection;
-			//requiresProbableHitTest = true; // Only players use probably hit info, AI uses fire target always
+			requiresProbableHitTest = true; // Only players use probably hit info, AI uses fire target always
 
 		    CPlayer *pPlayer = static_cast<CPlayer *>(g_pGame->GetIGameFramework()->GetClientActor());
      		    bool ThirdPerson = pPlayer->IsThirdPerson();
@@ -1214,15 +1215,16 @@ Vec3 CSingle::GetProbableHit(float maxRayLength, bool *pbHit, ray_hit *pHit) con
     		     {      
     		        Vec3 AimTarget = pPlayer->m_tpvAimTarget;
     		        dir = AimTarget;
-   		        requiresProbableHitTest = true; // Only players use probably hit info, AI uses fire target always
+   		    // Only players use probably hit info, AI uses fire target always
    		      }
    		      else
    		      {
    		         dir = info.fireDirection;
-           		 requiresProbableHitTest = true; // Only players use probably hit info, AI uses fire target always
+           	// Only players use probably hit info, AI uses fire target always
        			}
 
 		}
+
 
 		CRY_ASSERT(dir.IsUnit());
 

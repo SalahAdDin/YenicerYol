@@ -10,6 +10,7 @@ Description: Utility functions for the playerstate
 History:
 - 14.10.10: Created by Stephen M. North
 - 19.11.2013:	Implements player Rotation in Free Camera(I believe this)
+- 09.12.2013:	Implements free Move for Player
 
 *************************************************************************/
 #include "StdAfx.h"
@@ -34,7 +35,7 @@ History:
 #include "Weapon.h"
 
 #include "IGameObject.h"
-
+#include "CameraModes.h"
 
 void CPlayerStateUtil::CalculateGroundOrJumpMovement( const CPlayer& player, const SActorFrameMovementParams &movement, const bool bigWeaponRestrict, Vec3 &move )
 {
@@ -388,17 +389,15 @@ void CPlayerStateUtil::UpdatePlayerPhysicsStats( CPlayer& player, SActorPhysics&
 
 void CPlayerStateUtil::ProcessTurning( CPlayer& player, float frameTime )
 {
+
 	if (player.m_stats.isRagDoll || player.m_stats.isGrabbed /*&& !m_player.IsPlayer()*/)
 		return;
 
     bool limitLegs = false;
-    bool ROTATION_AFFECTS_THIRD_PERSON_MODEL = ( (player.m_actions & ACTION_MOVE) || !player.IsThirdPerson() || player.m_stats.inFiring ) ? true : false;
-   float ROTATION_SPEED = g_pGameCVars->goc_Player_Rotation_Speed;
+    bool ROTATION_AFFECTS_THIRD_PERSON_MODEL = ( (player.m_actions & ACTION_MOVE) || !player.IsThirdPerson()) ? true : false;  //|| player.m_stats.inFiring
+    float ROTATION_SPEED = g_pGameCVars->cl_tpvPlayer_Rotation_Speed;
 
-//	const bool ROTATION_AFFECTS_THIRD_PERSON_MODEL = true;
-//	static const float ROTATION_SPEED = 23.3f;
-
-    if ( player.IsThirdPerson() && g_pGameCVars->goc_CameraMode==2 )
+    if ( player.IsThirdPerson() && g_pGameCVars->cl_tpvCameraMode==eTPVM_Orbit )
     {
         EntityId itemId = player.GetInventory()->GetCurrentItem();
        if (itemId)
@@ -407,7 +406,7 @@ void CPlayerStateUtil::ProcessTurning( CPlayer& player, float frameTime )
             {
                 if( IWeapon* weapon = item->GetIWeapon() )
                 {
-                    if ( weapon->IsZoomed() || weapon->IsZoomingInOrOut() || player.m_stats.inFiring )
+                    if ( weapon->IsZoomed() || weapon->IsZoomingInOrOut()  ) //|| player.m_stats.inFiring
                     {
                         ROTATION_AFFECTS_THIRD_PERSON_MODEL = true;
                         limitLegs = true;
@@ -417,6 +416,8 @@ void CPlayerStateUtil::ProcessTurning( CPlayer& player, float frameTime )
         }   
    }
 
+
+
 	Quat entityRot = player.GetEntity()->GetWorldRotation().GetNormalized();
 	Quat inverseEntityRot = entityRot.GetInverted();
 	const Quat baseQuat = player.GetBaseQuat();
@@ -425,7 +426,7 @@ void CPlayerStateUtil::ProcessTurning( CPlayer& player, float frameTime )
 	
 
 	// TODO: figure out a way to unify this
-	if (player.IsThirdPerson()  && g_pGameCVars->goc_CameraMode>=2)
+	if (player.IsThirdPerson()  && g_pGameCVars->cl_tpvCameraMode>=eTPVM_Orbit)
 	{
 		
 		Quat m_turnTarget;
@@ -434,7 +435,8 @@ void CPlayerStateUtil::ProcessTurning( CPlayer& player, float frameTime )
 		Vec3 up = baseQuat.GetColumn2().GetNormalized();
 		Vec3 forward = (up % right).GetNormalized();
 		m_turnTarget = Quat( Matrix33::CreateFromVectors(forward%up, forward, up) );
-
+		ICVar* enableAimIK = gEnv->pConsole->GetCVar("ca_UseAimIK");
+ 		
 		if (ROTATION_AFFECTS_THIRD_PERSON_MODEL)
 		{
 			if (player.m_stats.inAir && isinZeroG)
@@ -447,59 +449,76 @@ void CPlayerStateUtil::ProcessTurning( CPlayer& player, float frameTime )
                 		request.rotation = inverseEntityRot * baseQuat;
             			request.rotation.Normalize();
             			}
-			else
-			{
+						else
+						{
+						m_turnTarget = baseQuat;		 
+						uint32 moveState = player.GetPlayerInput()->GetMoveButtonsState();
+						float turn = 0.0f;
 
-                m_turnTarget = baseQuat;		 
-                uint32 moveState = player.GetPlayerInput()->GetMoveButtonsState();
-            	float turn = 0.0f; //m_player.GetAngles().z;//m_movement.deltaAngles.z;
+						float fAddRot = 0.f;
+						float scale = (limitLegs) ? 0.5f : 1.0f;
 
-                float fAddRot = 0.f;
-                float scale = (limitLegs) ? 0.5f : 1.0f;
+						if ( moveState & CPlayerInput::eMBM_Back && !limitLegs )
+						{
+							if ( moveState & CPlayerInput::eMBM_Forward )
+								return;
+								
+							fAddRot = gf_PI;
+							if (player.m_stats.inFiring)
+								enableAimIK->Set(1);
+								else
+								if (!player.m_stats.inFiring)
+								enableAimIK->Set(0);							
 
-                if ( moveState & CPlayerInput::eMBM_Back && !limitLegs )
-                {
-                    if ( moveState & CPlayerInput::eMBM_Forward )
-                        return;
-						
-                    fAddRot = gf_PI;
+							if ( moveState & CPlayerInput::eMBM_Left )
+								fAddRot -= gf_PI/4;
+							if ( moveState & CPlayerInput::eMBM_Right )
+								fAddRot += gf_PI/4;
+						}
+						if ( moveState & CPlayerInput::eMBM_Forward )
+						{
+							fAddRot = 0.f;
+							enableAimIK->Set(1);
 
-                    if ( moveState & CPlayerInput::eMBM_Left )
-                        fAddRot -= gf_PI/4;
-                    if ( moveState & CPlayerInput::eMBM_Right )
-                        fAddRot += gf_PI/4;
-                }
-                if ( moveState & CPlayerInput::eMBM_Forward )
-                {
-                    fAddRot = 0.f;
+							if ( moveState & CPlayerInput::eMBM_Left )
+								fAddRot += gf_PI/4;
+							if ( moveState & CPlayerInput::eMBM_Right )
+								fAddRot -= gf_PI/4;
+						}
+						if ( !( moveState & CPlayerInput::eMBM_Forward ) && !( moveState & CPlayerInput::eMBM_Back ) )
+						{
+							if ( moveState & CPlayerInput::eMBM_Left )
+							{
+								if ( moveState & CPlayerInput::eMBM_Right )
+									return;
 
-                    if ( moveState & CPlayerInput::eMBM_Left )
-                        fAddRot += gf_PI/4;
-                    if ( moveState & CPlayerInput::eMBM_Right )
-                        fAddRot -= gf_PI/4;
-                }
-                if ( !( moveState & CPlayerInput::eMBM_Forward ) && !( moveState & CPlayerInput::eMBM_Back ) )
-                {
-                    if ( moveState & CPlayerInput::eMBM_Left )
-                    {
-                        if ( moveState & CPlayerInput::eMBM_Right )
-                            return;
-
-                        fAddRot += (gf_PI/2)*scale;
-                    }
-                    if ( moveState & CPlayerInput::eMBM_Right )
-                        fAddRot -= (gf_PI/2)*scale;
-                }
-                m_turnTarget = Quat::CreateRotationZ(turn) * m_turnTarget;
-                m_turnTarget *= Quat::CreateRotationZ(fAddRot);
-				Quat turnQuat = inverseEntityRot * m_turnTarget;
-            
-				float turnAngle = cry_acosf( CLAMP( FORWARD_DIRECTION.Dot(turn * FORWARD_DIRECTION), -1.0f, 1.0f ) );
-				float turnRatio = turnAngle / (ROTATION_SPEED * frameTime);
-            if (turnRatio > 1)
-               turnQuat = Quat::CreateSlerp( Quat::CreateIdentity(), turnQuat, 1.0f/turnRatio );
-				request.rotation = turnQuat;
-			}
+								fAddRot += (gf_PI/2)*scale;
+								if (player.m_stats.inFiring)
+								enableAimIK->Set(1);
+								else
+								if (!player.m_stats.inFiring && enableAimIK)
+								enableAimIK->Set(0);		
+							}
+							if ( moveState & CPlayerInput::eMBM_Right )
+							{
+								fAddRot -= (gf_PI/2)*scale;
+								if (player.m_stats.inFiring)
+								enableAimIK->Set(1);
+								else
+								if (!player.m_stats.inFiring && enableAimIK)
+								enableAimIK->Set(0);		
+							}
+						}
+						m_turnTarget = Quat::CreateRotationZ(turn) * m_turnTarget;
+						m_turnTarget *= Quat::CreateRotationZ(fAddRot);
+						Quat turnQuat = inverseEntityRot * m_turnTarget;
+					
+						float turnAngle = cry_acosf( CLAMP( FORWARD_DIRECTION.Dot(turn * FORWARD_DIRECTION), -1.0f, 1.0f ) );
+						float turnRatio = turnAngle / (ROTATION_SPEED * frameTime);
+					if (turnRatio > 1)
+					   turnQuat = Quat::CreateSlerp( Quat::CreateIdentity(), turnQuat, 1.0f/turnRatio );
+					request.rotation = turnQuat;
+					}
 		}
 	}
 	else
@@ -509,7 +528,9 @@ void CPlayerStateUtil::ProcessTurning( CPlayer& player, float frameTime )
 		request.rotation.Normalize();
    	}
 
- }
+
+}
+
 
 void CPlayerStateUtil::InitializeMoveRequest( SCharacterMoveRequest& frameRequest )
 {
@@ -694,6 +715,7 @@ bool CPlayerStateUtil::ShouldSprint( const CPlayer& player, const SActorFrameMov
 	return shouldSprint;
 }
 
+
 void CPlayerStateUtil::ApplyFallDamage( CPlayer& player, const float startFallingHeight, const float fHeightofEntity )
 {
 	CRY_ASSERT(player.IsClient());
@@ -795,6 +817,7 @@ void CPlayerStateUtil::CancelCrouchAndProneInputs(CPlayer & player)
 		playerInput->ClearProneAction();
 	}
 }
+
 
 void CPlayerStateUtil::ChangeStance( CPlayer& player, const SStateEvent& event )
 {

@@ -8,6 +8,7 @@ $DateTime$
 -------------------------------------------------------------------------
 History:
 - 19:11:2013	Implement Fix Actions for Thrid Person Actions
+- 19:11:2013	Implement Fix Actions for System Camera Actions
 
 *************************************************************************/
 #include "StdAfx.h"
@@ -18,6 +19,7 @@ History:
 //#include "Utility/CryWatch.h"
 
 #include "GameConstantCVars.h"
+#include "CameraModes.h"
 
 //--- TODO! Move these somewhere more sensible!
 
@@ -421,12 +423,12 @@ CPlayerMovementAction::EMoveState CPlayerMovementAction::CalculateState(float *p
 
 				const float signedAngle		= Ang3::CreateRadZ(animLoc.GetColumn1(), viewDir);
 				const float unsignedAngle = fabsf(signedAngle);
-
 				float TRIGGER_TURN_ANGLE= DEG2RAD(35.0f);
-				if (g_pGameCVars->goc_CameraMode>=2)
-					{
-						TRIGGER_TURN_ANGLE= DEG2RAD(360.0f);
-					}
+				if (g_pGameCVars->cl_tpvCameraMode >= eTPVM_Orbit)
+				{
+					TRIGGER_TURN_ANGLE= DEG2RAD(360.0f);
+				}
+
 				const float MIN_TURN_ANGLE				= DEG2RAD(65.0f);
 				const float MAX_TURN_ANGLE				= DEG2RAD(130.0f);
 				const float MIN_SPIN_ANGLE				= DEG2RAD(20.0f);

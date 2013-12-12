@@ -12,6 +12,7 @@ History:
 - 04:11:2013	Implement Third Person Camera with Collission, tutorial by RodrigoMedeiros, GooFNK and berni
 				In this file Implements ThirdCameraPose new Method
 - 19:11:2013	Implements other Camera Modes(Free TP, TP Fixed, RTS) by berni
+- 09:12:2013	Implements System Camera Modes by berni
 
 *************************************************************************/
 
@@ -106,14 +107,7 @@ CDefaultCameraMode::~CDefaultCameraMode()
 
 bool CDefaultCameraMode::UpdateView(const CPlayer& clientPlayer, SViewParams& viewParams, float frameTime)
 {
-
-	//CPlayer* pPlayerActor = static_cast<CPlayer*>(gEnv->pGame->GetIGameFramework()->GetClientActor());
-	//if (pPlayerActor)
-	//	pPlayerActor->SetThirdPerson(true);
-
-
 	viewParams.fov = g_pGame->GetFOV()* clientPlayer.GetActorParams().viewFoVScale * (gf_PI/180.0f);
-
 	viewParams.nearplane = g_pGameCVars->cl_nearPlane;
 
 	bool isThirdPerson = clientPlayer.IsThirdPerson();
@@ -227,61 +221,164 @@ CCameraPose CDefaultCameraMode::FirstPersonCameraPose(const CPlayer& clientPlaye
 
 CCameraPose CDefaultCameraMode::ThirdPersonCameraPose(const CPlayer& clientPlayer, const SViewParams& viewParams) const
 {
+	// Setting FrameTime
 	float frameTime=min(gEnv->pTimer->GetFrameTime(),0.1f);
 	const Matrix34& clientPlayerTM = clientPlayer.GetEntity()->GetWorldTM();
-
-	const Vec3 cameraDistanceVector = viewParams.rotation.GetColumn1() * -g_pGameCVars->cl_tpvDistLedge;
-	const Vec3 stanceViewOffset = clientPlayer.GetBaseQuat() * clientPlayer.GetStanceViewOffset(clientPlayer.GetStance());
-
-	const float cameraYaw = g_pGameCVars->cl_tpvYaw;
-	float tempTargetx=0.0f;
-	float tempTargety=0.0f;
-	float tempTargetz=0.0f;
-	float altura=0.0f;
-	Quat cameraYawRotation =
-		cameraYaw > 0.001f ? 
-			Quat::CreateRotationXYZ(Ang3(0, 0, cameraYaw * gf_PI/180.0f)) :
-			Quat(IDENTITY);
-	Vec3 target;
-	float flagz=0.0f;
-	Quat tpCameraRotation;
-	//if (g_pGameCVars->goc_CameraMode<3)
-		
-	
-	Vec3 tpCameraPosition = clientPlayerTM.GetTranslation() + cameraDistanceVector + stanceViewOffset;
-	if (g_pGameCVars->goc_CameraMode>0)
+	// Getting PlayerStats and Setting FrameTime. If Player is firing, activate UseAimIK for correct aiming
+	const SPlayerStats* pPlayerStats = static_cast<const SPlayerStats*>(clientPlayer.GetActorStats());
+	if (pPlayerStats->inFiring)
 	{
-		if (g_pGameCVars->goc_CameraMode>=3)
-		{
-		flagz=g_pGameCVars->goc_RTS_Distance;
-		ICVar* gocCross = gEnv->pConsole->GetCVar("goc_Crosshair_Mode");
-		if( gocCross != NULL )
-			{
-				gocCross->Set(1);
-			}
-		tempTargetx=0.0f;
-		tempTargety=0.0f;
-		if (g_pGameCVars->goc_RTS_Mouse_Character==0)
-			tempTargety=g_pGameCVars->cl_tpvDist*2;
-			
-		
-		tempTargetz=0.0f;
-		altura=0.0f;
+			ICVar* enableAimIK = gEnv->pConsole->GetCVar("ca_UseAimIK");
+			enableAimIK->Set(1);
+	 }
 
+	 //Configure Rotation,position for differents Camera Modes.
+	//const Vec3 cameraDistanceVector = viewParams.rotation.GetColumn1() * -g_pGameCVars->cl_tpvDist;
+	const Vec3 stanceViewOffset = clientPlayer.GetBaseQuat() * clientPlayer.GetStanceViewOffset(clientPlayer.GetStance());
+	float cameraZoomDistance = g_pGameCVars->cl_tpvDist * g_pGameCVars->cl_tpvZoom;
+	Vec3 cameraDistanceVector;
+	bool enableLabel=false;
+	float RTSDistance = 0.0f;
+	float fmoveSpecialX,fmoveSpecialY,fmoveSpecialZ;
+	fmoveSpecialX= g_pGameCVars->cl_tpvViewOffsetX;
+	fmoveSpecialY= g_pGameCVars->cl_tpvViewOffsetY;
+	fmoveSpecialZ=g_pGameCVars->cl_tpvViewOffsetZ;
+	Quat tpCameraRotation;
+	Matrix34 rotationScroll = Matrix33::CreateRotationVDir(Vec3(0.02f, DEG2RAD (60),0.02f).GetNormalizedSafe());
+	const Ang3 AnglesRTS = Ang3(DEG2RAD (-45),0.0f,0.0f);
+	const Ang3 AnglesSpecial = Ang3(DEG2RAD (-45),0.0f,0.0f);
+	
+	// Work out the effects for pitch, yaw and roll.
+	const Quat cameraPitchRotation = g_pGameCVars->cl_tpvPitch > 0.001f
+									 ? Quat::CreateRotationXYZ (Ang3 (DEG2RAD (g_pGameCVars->cl_tpvPitch), 0, 0)) : Quat (IDENTITY);
+	const Quat cameraYawRotation = g_pGameCVars->cl_tpvYaw > 0.001f
+								   ? Quat::CreateRotationXYZ (Ang3 (0, 0, DEG2RAD (g_pGameCVars->cl_tpvYaw))) : Quat (IDENTITY);
+	const Quat cameraRollRotation = g_pGameCVars->cl_tpvRoll > 0.001f
+									? Quat::CreateRotationXYZ (Ang3 (0, DEG2RAD (g_pGameCVars->cl_tpvRoll), 0)) : Quat (IDENTITY);
+	
+	if (g_pGameCVars->cl_tpvShowLabelTPSMode==1)  //If enableLabel true, show mode camera label text in screen
+		enableLabel=true;
 		
-		}
-		else
+	switch (g_pGameCVars->cl_tpvCameraMode)
+	{
+		case eTPVM_NearPlayer:
+			fmoveSpecialY= fmoveSpecialY>-1.0f?-1.0f: fmoveSpecialY/2;
+			cameraDistanceVector = viewParams.rotation.GetColumn1 () * -cameraZoomDistance ;
+			if (enableLabel)
+				CryWatch("TPS Camera Near Player Mode");
+			RTSDistance = 0.0f;
+			tpCameraRotation = clientPlayer.GetViewQuatFinal () * cameraPitchRotation * cameraYawRotation * cameraRollRotation;
+
+			break;
+
+		case eTPVM_Follow:
+			cameraDistanceVector = viewParams.rotation.GetColumn1 () * -cameraZoomDistance;
+			if (enableLabel)
+				CryWatch("TPS Camera Follow Mode");
+			RTSDistance = 0.0f;
+			tpCameraRotation = clientPlayer.GetViewQuatFinal () * cameraPitchRotation * cameraYawRotation * cameraRollRotation;
+			break;
+
+		case eTPVM_Kite:
+			fmoveSpecialY= fmoveSpecialY>-8.0f?-8.0f: fmoveSpecialY;
+			cameraDistanceVector = viewParams.rotation.GetColumn1 () * -cameraZoomDistance
+								   + viewParams.rotation.GetColumn2 () * cameraZoomDistance;
+			if (enableLabel)
+				CryWatch("RTS Camera Kite Mode");
+			RTSDistance = g_pGameCVars->cl_tpvRTS_Distance/2;
+			tpCameraRotation =  Quat(AnglesRTS);
+			break;
+
+		case eTPVM_Orbit:
+			cameraDistanceVector = viewParams.rotation.GetColumn1 () * -cameraZoomDistance;
+			if (enableLabel)
+				CryWatch("TPS Camera Orbit Mode");
+			RTSDistance = 0.0f;
+			tpCameraRotation = clientPlayer.GetViewQuatFinal () * cameraPitchRotation * cameraYawRotation * cameraRollRotation;
+			break;
+
+		case eTPVM_RTS:
+			cameraDistanceVector = viewParams.rotation.GetColumn1 () * -cameraZoomDistance
+								   + viewParams.rotation.GetColumn2 () * cameraZoomDistance;
+			if (enableLabel)
+				CryWatch("RTS Camera Mode");
+			RTSDistance = g_pGameCVars->cl_tpvRTS_Distance;
+			tpCameraRotation = clientPlayer.GetViewQuatFinal () * Quat(AnglesRTS);
+			break;
+
+		case eTPVM_SideScroll:
+			fmoveSpecialY= fmoveSpecialY>-10.0f?-10.0f: fmoveSpecialY;
+			cameraDistanceVector = viewParams.rotation.GetColumn0 () * cameraZoomDistance;
+			if (enableLabel)
+				CryWatch("RTS Camera SideScroll Mode");
+			RTSDistance = g_pGameCVars->cl_tpvRTS_Distance;
+			tpCameraRotation =  Quat(rotationScroll);
+			break;
+
+		default:
+			cameraDistanceVector = viewParams.rotation.GetColumn1 () * -cameraZoomDistance;
+			tpCameraRotation = clientPlayer.GetViewQuatFinal () * cameraPitchRotation * cameraYawRotation * cameraRollRotation;
+			break;
+	}
+	
+	//Setting a Special camera moves if cl_tpvSpecialCameraMotion and cl_tpvSpecialCameraMotionRTS is enabled
+
+if (g_pGameCVars->cl_tpvCameraMode>=eTPVM_Follow && g_pGameCVars->cl_tpvCameraMode<=eTPVM_NearPlayer && g_pGameCVars->cl_tpvSpecialCameraMotion>0)
+
+	{
+		if (clientPlayer.GetStance()==STANCE_CROUCH)
 		{
-		flagz=1.0f;
-		tempTargetx=g_pGameCVars->cl_tpvOffsetLeftRight;
-		tempTargety=g_pGameCVars->cl_tpvDist;
-		tempTargetz=g_pGameCVars->cl_tpvOffsetUpDown;
-		altura=0.0f;
-		
+		fmoveSpecialY=-1.f;
+		fmoveSpecialX=0.35f;
+		fmoveSpecialZ=0.0f;
 		}
+		if (clientPlayer.IsJumping() && !clientPlayer.IsOnLedge())
+		{
+		fmoveSpecialY=fmoveSpecialY*1.1f;
+		fmoveSpecialZ=fmoveSpecialZ*0.5f;
+		}
+		if (clientPlayer.IsInAir() && !clientPlayer.IsOnLedge())
+		{
+		fmoveSpecialY=fmoveSpecialY*1.1f;
+		fmoveSpecialZ=fmoveSpecialZ*0.5f;
+		}
+		if (clientPlayer.IsSprinting())
+		{
+		fmoveSpecialY=-1.5f;
+		fmoveSpecialX=0.4f;
+		fmoveSpecialZ=0.0f;
+		}
+	}
+	
+	if (g_pGameCVars->cl_tpvCameraMode>=eTPVM_RTS && g_pGameCVars->cl_tpvSpecialCameraMotionRTS>0)
+
+	{
+		if (clientPlayer.GetStance()==STANCE_SWIM)
+		{
 		
-		target = Vec3(tempTargetx,tempTargety,tempTargetz);
-		//Vec3 target(g_pGameCVars->goc_targetx, g_pGameCVars->goc_targety, g_pGameCVars->goc_targetz);
+		fmoveSpecialY=-3.0f;
+		fmoveSpecialX=0.35f;
+		fmoveSpecialZ=0.0f;
+		}
+	}
+	//End Setting  Special camera moves
+	
+	// When applying yaw or roll you need to adjust the camera tilt / turn system or the results
+	// are very weird.
+	// Apply the camera offsets using the player's co-ord system.
+	tpCameraRotation.Normalize();
+	Vec3 viewOffsetX = viewParams.rotation.GetColumn0 () * fmoveSpecialX;
+	Vec3 viewOffsetY = viewParams.rotation.GetColumn1 () * fmoveSpecialY;
+	Vec3 viewOffsetZ = viewParams.rotation.GetColumn2 () * fmoveSpecialZ;
+	Vec3 tpCameraPosition = clientPlayerTM.GetTranslation() + cameraDistanceVector + stanceViewOffset + viewOffsetX + viewOffsetY + viewOffsetZ;
+
+
+	
+// If camera mode >0 (etPVM_FPS), detect collision implemented. I set three collisions. Collision with terrain only, and collision with solid, rigid and other entities. 
+
+	if (g_pGameCVars->cl_tpvCameraMode>eTPVM_FPS)
+	{
+		Vec3 target(fmoveSpecialX,fmoveSpecialY,fmoveSpecialZ);
 		static Vec3 current(target);
 
 		Interpolate(current, target, 5.0f, frameTime);
@@ -290,40 +387,19 @@ CCameraPose CDefaultCameraMode::ThirdPersonCameraPose(const CPlayer& clientPlaye
 		if (pActor)
 		{
 			Matrix34 worldTM = pActor->GetEntity()->GetWorldTM();
-			
-			Vec3 worldPos = worldTM.GetTranslation();
-			Vec3 offsetX(0,0,0);
-			Vec3 offsetY(0,0,0);
-			Vec3 offsetZ(0,0,0);
-			Quat viewQuat = clientPlayer.GetViewQuat();
-			offsetX = viewQuat.GetColumn0() * current.x;
-			offsetY = viewQuat.GetColumn1() * (current.y); //-0.25f
-			offsetZ = viewQuat.GetColumn2() * current.z;
-			worldPos.z += flagz;
-	
-			Ang3 worldAngles = Ang3::GetAnglesXYZ(Matrix33(worldTM));
-			float rot = worldAngles.z;// + m_rot;
-			float distance = 0;//(m_defaultDistance != 0) ? m_defaultDistance : m_distance;
+			Vec3 worldPos = clientPlayerTM.GetTranslation() ; 
+			worldPos.z += 1.0f;
 			Vec3 goal;
-			float zoom = 1.0f;
-			goal.x = distance * zoom * cosf(rot + gf_PI*1.5f) + worldPos.x;
-			goal.y = distance * zoom * sinf(rot - gf_PI/2.0f) + worldPos.y;
-			goal.z = 0.0f;
-			goal += offsetX+offsetY+offsetZ;
+			bool bOnlyOneContact=false;
+			goal = clientPlayerTM.GetTranslation() + cameraDistanceVector + stanceViewOffset + viewOffsetX+viewOffsetY+viewOffsetZ;
 			AABB targetBounds;
 			pActor->GetEntity()->GetLocalBounds(targetBounds);
-			goal.z = targetBounds.max.z;
-			static float defaultOffset = 0.1f;
+			//goal.z += targetBounds.max.z/2;
+			static float defaultOffset = 0.0f;
 			float offset = defaultOffset;
-			if (g_pGameCVars->goc_CameraMode>=3)
-			{
-				goal.z += pActor->GetEntity()->GetWorldPos().z + offset + g_pGameCVars->goc_RTS_Distance;
-			}
-			else
-			{
-				goal.z += pActor->GetEntity()->GetWorldPos().z + offset + g_pGameCVars->cl_tpvOffsetUpDown;			
-			}
-			//goal.z += pActor->GetEntity()->GetWorldPos().z + offset + g_pGameCVars->goc_targetz;
+			
+			
+			goal.z +=  offset + fmoveSpecialZ + RTSDistance;
 			static Vec3 viewOffset(goal-worldPos);
 			static Vec3 position(goal);
 			static Vec3 entPos(worldPos);
@@ -344,24 +420,30 @@ CCameraPose CDefaultCameraMode::ThirdPersonCameraPose(const CPlayer& clientPlaye
 				stl::push_back_unique(skipList, pSkipEntities[i]);
 				}
 			
-			const float wallSafeDistance = 0.2f; // how far to keep camera from walls
+			float wallSafeDistance = g_pGameCVars->cl_tpvSphereCollider; // how far to keep camera from walls. Size of sphere collider.
 
 			Vec3 dir = goal - worldPos;
 
+	// Configure Sphere primitive for use as element collider
 			primitives::sphere sphere;
 			sphere.center = worldPos;
 			sphere.r = wallSafeDistance;
-
-			geom_contact *pContact = 0;          
-			float hitDist = gEnv->pPhysicalWorld->PrimitiveWorldIntersection(sphere.type, &sphere, dir, ent_static|ent_terrain|ent_rigid|ent_sleeping_rigid,
+			geom_contact *pContact = 0; 
+			
+	//First hit. Detecting if camera hits with entities. Actors, static entities and rigid body
+			float hitDist = gEnv->pPhysicalWorld->PrimitiveWorldIntersection(sphere.type, &sphere, dir, ent_living|ent_static|ent_rigid|ent_sleeping_rigid,
 			&pContact, 0, geom_colltype_player, 0, 0, 0, pSkipEntities, nSkip);
 
 			// even when we have contact, keep the camera the same height above the target
-			float minHeightDiff = dir.z;
-
+			float minHeightDiff = dir.z; 
+			
+			//If hit, I set camera above the player's head
 	if(hitDist > 0 && pContact)
-	{
+	{	
+		bOnlyOneContact=true;
 		goal = worldPos + (hitDist * dir.GetNormalizedSafe());
+		goal.z = targetBounds.max.z;
+		goal.z +=   pActor->GetEntity()->GetWorldPos().z+0.02f;
 		
 		if(goal.z - worldPos.z < minHeightDiff)
 		{
@@ -370,22 +452,35 @@ CCameraPose CDefaultCameraMode::ThirdPersonCameraPose(const CPlayer& clientPlaye
 
 			// (move back just slightly to avoid colliding with the wall we've already found...)
 			sphere.center -= dir.GetNormalizedSafe() * 0.05f;
+			
+			//Second hit, for readjust collision 
 
-			float newHitDist = gEnv->pPhysicalWorld->PrimitiveWorldIntersection(sphere.type, &sphere, Vec3(0,0,minHeightDiff), ent_static|ent_terrain|ent_rigid|ent_sleeping_rigid,
+			float newHitDist = gEnv->pPhysicalWorld->PrimitiveWorldIntersection(sphere.type, &sphere, Vec3(0,0,minHeightDiff), ent_living|ent_static|ent_rigid|ent_sleeping_rigid,
 				&pContact, 0, geom_colltype_player, 0, 0, 0, pSkipEntities, nSkip);
 
 			float raiseDist = minHeightDiff - (goal.z - worldPos.z) - wallSafeDistance;
 			if(newHitDist != 0)
 			{
+				bOnlyOneContact=true;
 				raiseDist = MIN(minHeightDiff, newHitDist);
 			}
 			
 			raiseDist = MAX(0.0f, raiseDist);
-			
 			goal.z += raiseDist +0.15f ;
 			worldPos.z += raiseDist*0.1f;
 		}
 	}
+	
+	// Third hit, only detect collision with terrain, to prevent that the camera is far below the player
+	sphere.r = g_pGameCVars->cl_tpvControlColliderTerrain;
+	float hitDist0 = gEnv->pPhysicalWorld->PrimitiveWorldIntersection(sphere.type, &sphere, dir, ent_terrain,
+	&pContact, 0, geom_colltype_player, 0, 0, 0, pSkipEntities, nSkip);
+		if(hitDist0 > 0 && pContact && bOnlyOneContact==false)
+			{		
+				goal = worldPos + (hitDist0 * dir.GetNormalizedSafe());
+			}
+					
+	//And finally, i set new camera position depending on the vectors goal and worldPos.
 	int thisFrameId = gEnv->pRenderer->GetFrameID();
 	static int frameNo(thisFrameId);
 	if(thisFrameId - frameNo > 5)
@@ -399,7 +494,7 @@ CCameraPose CDefaultCameraMode::ThirdPersonCameraPose(const CPlayer& clientPlaye
 
 	if(pActor->GetLinkedVehicle())
 	{
-		Interpolate(viewOffset, goal-worldPos, 5.0f, viewParams.frameTime);
+		Interpolate(viewOffset, goal-worldPos, 5.0f, viewParams.frameTime);  //Interpolate position camera for smooth motion if player in vehicle
 		entPos = worldPos;
 		tpCameraPosition = worldPos + viewOffset;
 		position = tpCameraPosition;
@@ -408,43 +503,23 @@ CCameraPose CDefaultCameraMode::ThirdPersonCameraPose(const CPlayer& clientPlaye
 	{
 		Vec3 camPosChange = goal - position;
 		Vec3 entPosChange = worldPos - entPos;
-
+	
 		if(camPosChange.GetLengthSquared() > 100.0f)
 			position = goal;
 		if(entPosChange.GetLengthSquared() > 100.0f)
 			entPos = worldPos;
 		//position = goal;
-		Interpolate(position, goal, 5.0f, viewParams.frameTime);
-		Interpolate(entPos, worldPos, 5.0f, viewParams.frameTime);
-		tpCameraPosition = position;
+		Interpolate(position, goal, 5.0f, viewParams.frameTime); //Interpolate position camera for smooth motion
+		Interpolate(entPos, worldPos, 5.0f, viewParams.frameTime); //Interpolate position camera for smooth motion
+		tpCameraPosition = position; //I set new position in camera position
 	}
 
-		}
+		 } 
 
-	}
-
-	//const Vec3 tpCameraPosition = clientPlayerTM.GetTranslation() + cameraDistanceVector + stanceViewOffset;
-	//const Quat tpCameraRotation = clientPlayer.GetViewQuatFinal() * cameraYawRotation;
-	if (g_pGameCVars->goc_CameraMode>=3)
-		{
-		const Matrix33 rotaciones = Matrix33::CreateRotationVDir(Vec3(0,-g_pGameCVars->goc_RTS_Pitch,-1));
-		//const Matrix33 invVrotaciones(rotaciones.GetInverted());
-		if (g_pGameCVars->goc_RTS_Mouse_Character>=1)
-			{
-			tpCameraRotation =  Quat(rotaciones);// clientPlayer.GetViewQuatFinal() * Quat(invVrotaciones);
-			return CCameraPose(tpCameraPosition, tpCameraRotation);
-			}
-			else
-			{
-			tpCameraRotation = clientPlayer.GetViewQuatFinal(); //* Quat(invVrotaciones);
-			// clientPlayer.GetViewQuatFinal() * Quat(invVrotaciones);
-			return CCameraPose(tpCameraPosition, tpCameraRotation);
-			
-			}
-		}
-	tpCameraRotation = clientPlayer.GetViewQuatFinal() * cameraYawRotation;
+		 }
 	return CCameraPose(tpCameraPosition, tpCameraRotation);
-	
+
+
 }
 
 
@@ -1683,6 +1758,7 @@ bool CPartialAnimationControlledCameraMode::UpdateView(const CPlayer& clientPlay
 	{
 		const Vec3 view3rdOffset =	(viewParams.rotation.GetColumn1() * -g_pGameCVars->cl_tpvDistLedge) +  
 																(clientPlayer.GetBaseQuat() * clientPlayer.GetStanceViewOffset(clientPlayer.GetStance()));
+
 		viewParams.position = clientPlayerTM.GetTranslation() + view3rdOffset;
 	}
 	else

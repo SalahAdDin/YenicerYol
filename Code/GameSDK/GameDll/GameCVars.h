@@ -375,24 +375,34 @@ struct SCVars
 #if !defined(XENON) && !defined(PS3)
 	float cl_mp_fov_scalar;
 #endif
-	float cl_tpvDist;
-	float goc_RTS_Distance;	
-	int goc_RTS_Mouse_Character;
-	float goc_Player_Rotation_Speed;
-	float goc_RTS_Pitch;
-	float cl_tpvOffsetLeftRight;
-	float cl_tpvOffsetUpDown;
-	int flash_croshair_enable;
-	int goc_CameraMode ;
-	int goc_Crosshair_Mode;
+// Third person view management.
+	int	cl_tpvCameraMode;
+	float	cl_tpvDist;
+	float	cl_tpvZoom;
+	float	cl_tpvPitch;
+	float	cl_tpvYaw;
+	float	cl_tpvRoll;
+	float	cl_tpvViewOffsetX;
+	float	cl_tpvViewOffsetY;
+	float	cl_tpvViewOffsetZ;
+	int	cl_tpvShowLabelTPSMode;
+	int	cl_tpvSpecialCameraMotion;
+	int	cl_tpvSpecialCameraMotionRTS;
+	
+	float cl_tpvRTS_Distance;	
+	float cl_tpvPlayer_Rotation_Speed;
+	int cl_tpvCrosshair_Mode;
+	float cl_tpvReallocateX;
+	float cl_tpvReallocateY;
+	float cl_tpvReallocateZ;
+	float cl_tpvSphereCollider;
 
 	float cl_nearPlane;
 	float cl_tpvDistLedge;
    	float cl_tpvMaxWeapDist;
    	int cl_tpvMaxWeapDistDebug;
+	float cl_tpvControlColliderTerrain;
 
-
-	float cl_tpvYaw;
 	float cl_sensitivity;
 	float cl_sensitivityController;
 	float cl_sensitivityControllerMP;

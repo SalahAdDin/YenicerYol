@@ -11,6 +11,7 @@ History:
 - 04:11:2013	Implement Third Person Camera with Collission, tutorial by RodrigoMedeiros, GooFNK and berni
 				In this file Implements ThirdCameraPose new Method
 - 19:11:2013	Implements Other Camera Modes Variables and Actions for TP Camera in Player variables
+- 09:12:2013	Register new CVars for Camera System
 
 *************************************************************************/
 #include "StdAfx.h"
@@ -577,22 +578,33 @@ void SCVars::InitCVars(IConsole *pConsole)
 #if !defined(XENON) && !defined(PS3)
 	REGISTER_CVAR_CB(cl_mp_fov_scalar, 1.f, 0, "field of view scale (multiplayer)", OnFOVMPChanged);
 #endif
-	REGISTER_CVAR(cl_tpvDist, -2.5f, 0, "camera distance in 3rd person view. Like goc_targety");
-	REGISTER_CVAR(goc_RTS_Distance, 5.0f, VF_NULL , "RTS Top Distance");
-	REGISTER_CVAR(goc_RTS_Mouse_Character, 0, 0, "Determines whether the mouse controls the character instead of the camera");
-	REGISTER_CVAR(goc_Player_Rotation_Speed, 6.0f, 0, "Determines the smooth rotation of the character in the third person");
-	REGISTER_CVAR(goc_RTS_Pitch, 0.2f, 0, "Pitch Camera in RTS Mode");
-	REGISTER_CVAR(cl_tpvOffsetLeftRight, 0.5f, 0, "x offset camera distance in 3rd person view. Like goc_targetx");
-	REGISTER_CVAR(cl_tpvOffsetUpDown, -0.1f, 0, "y offset camera distance in 3rd person view. Like goc_targetz");
-	REGISTER_CVAR(goc_Crosshair_Mode, VF_NULL, 0, "Crosshair Default = 0 - New Crosshair = 1 - No Crosshair = 2");
-	REGISTER_CVAR(cl_nearPlane, 0.011f, 0, "near clip plane camera in 3rd person view");
-	REGISTER_CVAR(cl_tpvDistLedge, 1.0f, 0, "Distance in y coordinate in 3rd person view");
+	// Third person view management
+	REGISTER_CVAR(cl_tpvCameraMode, 0 , 0 , "FirstPerson =0, Follow = 1, Orbit = 2, NearPlayer = 3, RTS = 4, Sidescroll = 5, Kite = 6" );
+	REGISTER_CVAR(cl_tpvDist, -0.6f, 0, "3rd person camera - distance from the camera target along y axis. Additional to cl_tpvViewOffsetY");
+	REGISTER_CVAR(cl_tpvZoom, 0.5f, 0, "3rd person camera - zoom level (0.0 - 1.0)");
+	REGISTER_CVAR(cl_tpvPitch, 0.0f, 0, "3rd person camera - pitch in degrees");
+	REGISTER_CVAR(cl_tpvYaw, 0.0f, 0, "3rd person camera - yaw in degrees");
+	REGISTER_CVAR(cl_tpvRoll, 0.0f, 0, "3rd person camera - roll in degrees");
+	REGISTER_CVAR(cl_tpvViewOffsetX, 0.5f, 0, "3rd person camera - view offset along the x axis");
+	REGISTER_CVAR(cl_tpvViewOffsetY, -3.0f, 0, "3rd person camera - view offset along the y axis");
+
+	REGISTER_CVAR(cl_tpvViewOffsetZ, 0.0f, 0, "3rd person camera - view offset along the z axis");
+	REGISTER_CVAR(cl_tpvRTS_Distance, 1.65f, VF_NULL , "In RTS mode Top Distance additional to cl_tpvViewOffsetZ. Used in RTS camera modes.");
+	REGISTER_CVAR(cl_tpvSphereCollider, 0.30f, VF_NULL , "If value 0, no camera collision with obstacles in 3rd person camera modes. Positive values only. Default value 0.30.");
+	REGISTER_CVAR(cl_tpvShowLabelTPSMode, 0, VF_NULL , "Show Message in screen with Mode Camera TPS Active.  1 = Active, 0 = Disabled");
+	REGISTER_CVAR(cl_tpvSpecialCameraMotion, 1, VF_NULL , "Allow the camera in TPS mode follow, orbit & NearPlayer to make some moves in certain actions.  1 = Active, 0 = Disabled");
+	REGISTER_CVAR(cl_tpvSpecialCameraMotionRTS, 1, VF_NULL , "Allow the camera in RTS modes to make some moves in certain actions.  1 = Active, 0 = Disabled");
+	REGISTER_CVAR(cl_tpvPlayer_Rotation_Speed, 6.0f, 0, "Determines the smooth rotation of the character in the third person free mode and RTS Modes. Larger values more circular motion effect.");
+	REGISTER_CVAR(cl_tpvCrosshair_Mode, VF_NULL, 0, "Crosshair Default = 0 - New Crosshair = 1 - No Crosshair = 2");
+	REGISTER_CVAR(cl_nearPlane, 0.011f, 0, "near clip plane camera in 3rd person view for avoid clip planes in obstacles");
+	REGISTER_CVAR(cl_tpvDistLedge, 2.7f, 0, "Distance in y coordinate in 3rd person view when we perform movements LedgeGrabbing.");
 	REGISTER_CVAR(cl_tpvMaxWeapDist, 250.0f, 0, "Max Weapon dist affects the also set max dist for Raycast weapon accuracy");
    	REGISTER_CVAR(cl_tpvMaxWeapDistDebug, 0, 0, "Turn on the debug visualization for the Ray and corresponding hit point");
-	REGISTER_CVAR(goc_CameraMode, 0 , 0 , "First Person = 0 - Third Person = 1 - FreeMode = 2 - RTS Mode = 3" );
+	REGISTER_CVAR(cl_tpvReallocateX, 0 , 0 , "Repositioning Aiming in X Coordinate." );
+	REGISTER_CVAR(cl_tpvReallocateY, 0 , 0 , "Repositioning Aiming in Y Coordinate." );
+	REGISTER_CVAR(cl_tpvReallocateZ, 0 , 0 , "Repositioning Aiming in Z Coordinate." );
+	REGISTER_CVAR(cl_tpvControlColliderTerrain, 0.1f , 0 , "Enable Collision with Terrain Displacement. Don't touch." );
 
-
-	REGISTER_CVAR(cl_tpvYaw, 0, 0, "camera angle offset in 3rd person view");
 	REGISTER_CVAR(cl_sensitivity, 30.0f, VF_DUMPTODISK, "Set mouse sensitivity!");
 	REGISTER_CVAR(cl_sensitivityController, 0.8f, VF_DUMPTODISK, "Set controller sensitivity! Expecting 0.0f to 2.0f");
 	REGISTER_CVAR(cl_sensitivityControllerMP, 1.1f, VF_DUMPTODISK, "Set controller sensitivity! Expecting 0.0f to 2.0f");
@@ -2107,23 +2119,31 @@ void SCVars::ReleaseCVars()
 	pConsole->UnregisterVariable("g_post3DRendererDebugGridSegmentCount", true);
 
 	pConsole->UnregisterVariable("cl_fov", true);
+	pConsole->UnregisterVariable("cl_tpvCameraMode", true);
 	pConsole->UnregisterVariable("cl_tpvDist", true);
-	pConsole->UnregisterVariable("goc_RTS_Distance", true);
-	pConsole->UnregisterVariable("goc_RTS_Mouse_Character", true);
-	pConsole->UnregisterVariable("goc_Player_Rotation_Speed", true);
-	pConsole->UnregisterVariable("goc_RTS_Pitch", true);
-	pConsole->UnregisterVariable("cl_tpvOffsetLeftRight", true);
-	pConsole->UnregisterVariable("cl_tpvOffsetUpDown", true);
-	pConsole->UnregisterVariable("goc_Crosshair_Mode", true);
-	pConsole->UnregisterVariable("goc_CameraMode",true);
-
+	pConsole->UnregisterVariable("cl_tpvZoom", true);
+	pConsole->UnregisterVariable("cl_tpvPitch", true);
+	pConsole->UnregisterVariable("cl_tpvYaw", true);
+	pConsole->UnregisterVariable("cl_tpvRoll", true);
+	pConsole->UnregisterVariable("cl_tpvViewOffsetX", true);
+	pConsole->UnregisterVariable("cl_tpvViewOffsetY", true);
+	pConsole->UnregisterVariable("cl_tpvViewOffsetZ", true);
+	pConsole->UnregisterVariable("cl_tpvRTS_Distance", true);
+	pConsole->UnregisterVariable("cl_tpvPlayer_Rotation_Speed", true);
+	pConsole->UnregisterVariable("cl_tpvCrosshair_Mode", true);
+	pConsole->UnregisterVariable("cl_tpvReallocateX",true);
+	pConsole->UnregisterVariable("cl_tpvReallocateY",true);
+	pConsole->UnregisterVariable("cl_tpvReallocateZ",true);
+	pConsole->UnregisterVariable("cl_tpvSphereCollider",true);
+	pConsole->UnregisterVariable("cl_tpvShowLabelTPSMode",true);
+	pConsole->UnregisterVariable("cl_tpvSpecialCameraMotion",true);
+	pConsole->UnregisterVariable("cl_tpvSpecialCameraMotionRTS",true);
 	pConsole->UnregisterVariable("cl_nearPlane", true);
 	pConsole->UnregisterVariable("cl_tpvDistLedge", true);
 	pConsole->UnregisterVariable("cl_tpvMaxWeapDist", true);
    	pConsole->UnregisterVariable("cl_tpvMaxWeapDistDebug", true);
+	pConsole->UnregisterVariable("cl_tpvControlColliderTerrain ", true);
 
-
-	pConsole->UnregisterVariable("cl_tpvYaw", true);
 	pConsole->UnregisterVariable("cl_sensitivity", true);
 	pConsole->UnregisterVariable("cl_sensitivityController", true);
 	pConsole->UnregisterVariable("cl_sensitivityControllerMP", true);

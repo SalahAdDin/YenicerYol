@@ -11,8 +11,10 @@
   - 29:9:2004: Created by Filippo De Luca
   - 04:11:2013	Implement Third Person Camera with Collission, tutorial by RodrigoMedeiros, GooFNK and berni
 				In this file Implements ThirdCameraPose new Method
+  - 09:12:2013	Implement Aim Varriable
 
 *************************************************************************/
+
 #ifndef __PLAYER_H__
 #define __PLAYER_H__
 
@@ -1698,7 +1700,7 @@ public:
 	bool m_bMakeVisibleOnNextSpawn: 1; 
 	bool m_bHasAimLimit : 1;
 	bool m_bPlayIntro : 1;
-	Vec3 m_tpvAimTarget;	//Declare new vector3 variable for tpvAimTarget
+	Vec3 m_tpvAimTarget;
 
 	int8 m_lastCachedInteractionIndex;
 

@@ -11,6 +11,7 @@ History:
 - 04:11:2013	Implement Third Person Camera with Collission, tutorial by RodrigoMedeiros, GooFNK and berni
 				In this file Implements ThirdCameraPose new Method
 - 19:11:2013	Implement Fix for Thrid Person Actions
+- 09:12:2013	New Crosshair for RTS Camera and synchronize Aiming for TPS
 
 *************************************************************************/
 #include "StdAfx.h"
@@ -149,6 +150,8 @@ History:
 #include "ProceduralContextRagdoll.h"
 
 #include "UI/UIManager.h"
+#include "IHardwareMouse.h"
+#include "CameraModes.h"
 
 DEFINE_STATE_MACHINE( CPlayer, Movement ); 
 
@@ -2119,7 +2122,26 @@ void CPlayer::SetIK( const SActorFrameMovementParams& frameMovementParams )
 
 	bool allowAimIK = IsPlayer();
 
-	if (allowAimIK)
+		if ( IsThirdPerson() )
+{
+    EntityId itemId = GetInventory()->GetCurrentItem();
+    if ( itemId )
+    {
+        CWeapon* weapon = GetWeapon(itemId);
+        if ( weapon )
+        {
+            if ( m_stats.inFiring || weapon->IsZoomed() || weapon->IsZoomingInOrOut() )
+            {
+                aimEnabled = true;
+				allowAimIK= true;
+            }
+        }
+    }
+}
+else
+    aimEnabled = true;
+
+		if (allowAimIK)
 	{
 		//aimTarget = curMovementState.eyePosition + curMovementState.aimDirection * 5.0f; // If this is too close the aiming will fade out.
 		//CWeapon *pWeapon = GetWeapon(GetCurrentItemId());
@@ -2134,15 +2156,15 @@ void CPlayer::SetIK( const SActorFrameMovementParams& frameMovementParams )
          Vec3 PlayerPos = clientPlayerTM.GetTranslation();
 
          Vec3 DistanceVec = ViewRotation.GetColumn1() * -g_pGameCVars->cl_tpvDist;
-         Vec3 DistanceLeftRight = ViewRotation.GetColumn0() * g_pGameCVars->cl_tpvOffsetLeftRight;
-         Vec3 DistanceUpDown = ViewRotation.GetColumn2() * g_pGameCVars->cl_tpvOffsetUpDown;
+         Vec3 DistanceLeftRight = ViewRotation.GetColumn0() * g_pGameCVars->cl_tpvViewOffsetX;
+         Vec3 DistanceUpDown = ViewRotation.GetColumn2() * g_pGameCVars->cl_tpvViewOffsetZ;
          Vec3 stanceViewOffset = GetBaseQuat() * GetStanceViewOffset(GetStance());
          
          Vec3 CameraPos = clientPlayerTM.GetTranslation() + DistanceVec + stanceViewOffset + DistanceLeftRight + DistanceUpDown;
          Vec3 CameraPosRay = clientPlayerTM.GetTranslation() + stanceViewOffset + DistanceLeftRight + DistanceUpDown;
          Vec3 CameraPosEnd = clientPlayerTM.GetTranslation() + DistanceVec + stanceViewOffset + DistanceLeftRight + DistanceUpDown + (curMovementState.aimDirection * WeaponMaxDist);
 
-         Vec3 CameraAimNorm = ((CameraPosEnd-CameraPosRay).normalize()*WeaponMaxDist);         
+         Vec3 CameraAimNorm = ((CameraPosEnd-CameraPosRay).normalize()*WeaponMaxDist)+ Vec3(g_pGameCVars->cl_tpvReallocateX,g_pGameCVars->cl_tpvReallocateY,g_pGameCVars->cl_tpvReallocateZ);         
 
          //RAYCAST to get the distance and hitpoint of any object it collides with
          static PhysSkipList skipList;
@@ -2152,7 +2174,8 @@ void CPlayer::SetIK( const SActorFrameMovementParams& frameMovementParams )
          IPhysicalEntity* skipEnts[1];
          skipEnts[0] = pEntity->GetPhysics();      
          gEnv->pPhysicalWorld->RayWorldIntersection(CameraPosRay, CameraAimNorm, ent_all, flags, &hit, 1, skipEnts, 1);
-		if (g_pGameCVars->goc_Crosshair_Mode==1)
+		 
+		if (g_pGameCVars->cl_tpvCrosshair_Mode==1)
 		        {		
 						CPlayer* pPlayerWeap = static_cast<CPlayer*>(g_pGame->GetIGameFramework()->GetClientActor());
 						CItem* pCurrentWeapon = static_cast<CItem*>(pPlayerWeap->GetCurrentItem());
@@ -2164,37 +2187,18 @@ void CPlayer::SetIK( const SActorFrameMovementParams& frameMovementParams )
 						float crossY=fabs(fabs(hit.pt.y)-fabs(posi.y));
 						if (crossX<0.6f || crossY<0.6f)
 							{ 
-							crossX=3.0f;
-							crossY=3.0f;
+							crossX=6.0f;
+							crossY=6.0f;
 							}
 						float sizeCross=(crossX+crossY)/(g_pGameCVars->cl_tpvMaxWeapDist/4.0f);
-						//CryWatch("Hit x: %f  Hit y: %f   Hit z: %f --- Posi x: %f  Posi y: %f  Posi z: %f  === Total: X %f  Y %f", hit.pt.x, hit.pt.y, hit.pt.z, posi.x, posi.y, posi.z, fabs(fabs(hit.pt.x)-fabs(posi.x)), fabs(fabs(hit.pt.y)-fabs(posi.y)));
 						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(posi,ColorB(128, 128, 128, 0),hit.pt,ColorB(128, 128, 128, 60),1.0f);
-						/*gEnv->pRenderer->GetIRenderAuxGeom()->DrawCone(hit.pt, Vec3(0,-1,0), 0.1f, 0.15f, ColorB(128, 200, 128, 10),1);
-						gEnv->pRenderer->GetIRenderAuxGeom()->DrawCone(hit.pt, Vec3(0,1,0), 0.1f, 0.15f, ColorB(128, 200, 128, 10),1);
-						gEnv->pRenderer->GetIRenderAuxGeom()->DrawCone(hit.pt, Vec3(1,0,0), 0.1f, 0.15f, ColorB(128, 200, 128, 10),1);
-						gEnv->pRenderer->GetIRenderAuxGeom()->DrawCone(hit.pt, Vec3(-1,0,0), 0.1f, 0.15f, ColorB(128, 200, 128, 10),1);
-						gEnv->pRenderer->GetIRenderAuxGeom()->DrawCone(hit.pt, Vec3(0,0,1), 0.1f, 0.15f, ColorB(128, 200, 128, 10),1);
-						gEnv->pRenderer->GetIRenderAuxGeom()->DrawCone(hit.pt, Vec3(0,0,-1), 0.1f, 0.15f, ColorB(128, 200, 128, 10),1);*/
 						gEnv->pRenderer->GetIRenderAuxGeom()->DrawSphere(hit.pt, sizeCross/2.0f, ColorB(127, 127, 255, 100),0);
-						/*gEnv->pRenderer->GetIRenderAuxGeom()->DrawSphere(hit.pt+Vec3(0,0.2,0), 0.075f, ColorB(255, 255, 255, 80),1);						
-						gEnv->pRenderer->GetIRenderAuxGeom()->DrawSphere(hit.pt+Vec3(0,-0.2,0), 0.075f, ColorB(255, 255, 255, 80),1);						
-						gEnv->pRenderer->GetIRenderAuxGeom()->DrawSphere(hit.pt+Vec3(0.2,0,0), 0.075f, ColorB(255, 255, 255, 80),1);
-						gEnv->pRenderer->GetIRenderAuxGeom()->DrawSphere(hit.pt+Vec3(-0.2,0,0), 0.075f, ColorB(255, 255, 255, 80),1);
-						gEnv->pRenderer->GetIRenderAuxGeom()->DrawSphere(hit.pt+Vec3(0,0,0.2), 0.075f, ColorB(255, 255, 255, 80),1);
-						gEnv->pRenderer->GetIRenderAuxGeom()->DrawSphere(hit.pt+Vec3(0,0,-0.2), 0.075f, ColorB(255, 255, 255, 80),1);*/						
 						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(0,sizeCross*1.5f,0),ColorB(255, 255, 255, 100),9.0f);
 						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(0,-sizeCross*1.5f,0),ColorB(255, 255, 255, 100),9.0f);
 						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(sizeCross*1.5f,0,0),ColorB(255, 255, 255, 100),9.0f);
 						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(-sizeCross*1.5f,0,0),ColorB(255, 255, 255, 100),9.0f);
 						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(0,0,sizeCross*1.5f),ColorB(255, 255, 255, 100),9.0f);
 						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(0,0,-sizeCross*1.5f),ColorB(255, 255, 255, 100),9.0f);
-						/*gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(0.3,0.3,0),ColorB(255, 128, 128, 60),7.0f);
-						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(-0.3,-0.3,0),ColorB(255, 128, 128, 60),7.0f);
-						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(0.3,0,0.3),ColorB(255, 128, 128, 60),7.0f);
-						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(-0.3,0,-0.3),ColorB(255, 128, 128, 60),7.0f);
-						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(0,0.3,0.3),ColorB(255, 128, 128, 60),7.0f);
-						gEnv->pRenderer->GetIRenderAuxGeom()->DrawLine(hit.pt,ColorB(128, 128, 128, 90),hit.pt+Vec3(0,-0.3,-0.3),ColorB(255, 128, 128, 60),7.0f);*/
 						}
 				}
 		
@@ -2221,7 +2225,7 @@ void CPlayer::SetIK( const SActorFrameMovementParams& frameMovementParams )
          IMovementController * pMC = pActor ? pActor->GetMovementController() : 0;
 
          m_tpvAimTarget = (NormAimTarget-pos).normalized();//assign the normalized value to the accessible table for passing to Single.cpp
-     	 }
+     }
      	 else
      	 {
          aimTarget = curMovementState.eyePosition+ curMovementState.aimDirection * 5.0f; // If this is too close the aiming will fade out.
@@ -2273,7 +2277,7 @@ void CPlayer::SetIK( const SActorFrameMovementParams& frameMovementParams )
 			if (pIPoseBlenderAim)
 			{
 				pIPoseBlenderAim->SetTarget(aimTarget);
-				pIPoseBlenderAim->SetPolarCoordinatesSmoothTimeSeconds(0.f);
+				pIPoseBlenderAim->SetPolarCoordinatesSmoothTimeSeconds(0.25f);
 			}
 
 			if (ICharacterInstance * pCharacterShadow = GetShadowCharacter())
@@ -2283,7 +2287,7 @@ void CPlayer::SetIK( const SActorFrameMovementParams& frameMovementParams )
 				if (pIPoseBlenderAimShadow)
 				{
 					pIPoseBlenderAimShadow->SetTarget(aimTarget);
-					pIPoseBlenderAimShadow->SetPolarCoordinatesSmoothTimeSeconds(0.f);
+					pIPoseBlenderAimShadow->SetPolarCoordinatesSmoothTimeSeconds(0.25f);
 				}
 			}
 		}
@@ -3131,39 +3135,53 @@ void CPlayer::RefreshVisibilityState()
 //-----------------------------------------------------------------------------
 void CPlayer::ToggleThirdPerson()
 {
-	ICVar* enablethird = gEnv->pConsole->GetCVar("goc_CameraMode");
-	ICVar* enablecross = gEnv->pConsole->GetCVar("goc_Crosshair_Mode");
-
+	ICVar* enablethird = gEnv->pConsole->GetCVar("cl_tpvCameraMode");
+	ICVar* enablecross = gEnv->pConsole->GetCVar("cl_tpvCrosshair_Mode");
 
 	int AlternateThird;
-	AlternateThird=g_pGameCVars->goc_CameraMode;
+	AlternateThird= g_pGameCVars->cl_tpvCameraMode;
 	AlternateThird++;
-	if (AlternateThird>3)
+	if (AlternateThird>6)
 		AlternateThird=0;
 	switch (AlternateThird)
 	{
-		case 0:
+		case eTPVM_FPS:
 		SetThirdPerson(false);
 		enablethird->Set(0);
 		enablecross->Set(0);
 		break;
-		case 1:
+		case eTPVM_Follow:
 		SetThirdPerson(true);
 		enablethird->Set(1);
-		enablecross->Set(1);
+		enablecross->Set(0);
 		break;
-		case 2:
+		case eTPVM_Orbit:
 		SetThirdPerson(true);
 		enablethird->Set(2);
-		enablecross->Set(1);
+		enablecross->Set(0);
 		break;
-		case 3:
+		case eTPVM_NearPlayer:
 		SetThirdPerson(true);
 		enablethird->Set(3);
+		enablecross->Set(0);
+		break;
+		case eTPVM_RTS:
+		SetThirdPerson(true);
+		enablethird->Set(4);
+		enablecross->Set(1);
+		break;
+		case eTPVM_SideScroll:
+		SetThirdPerson(true);
+		enablethird->Set(5);
+		enablecross->Set(1);
+		break;
+		case eTPVM_Kite:
+		SetThirdPerson(true);
+		enablethird->Set(6);
 		enablecross->Set(1);
 		break;
 	}
-	
+
 }
 
 void CPlayer::SetThirdPerson(bool thirdPersonEnabled)
@@ -10346,3 +10364,4 @@ void CPlayer::RMIBenchmarkCallback( ERMIBenchmarkLogPoint point0, ERMIBenchmarkL
 }
 
 #endif
+
