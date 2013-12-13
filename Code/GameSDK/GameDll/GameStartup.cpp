@@ -8,6 +8,7 @@ $DateTime$
 -------------------------------------------------------------------------
 History:
 - 2:8:2004   15:20 : Created by Márcio Martins
+- 12:12:13	Implements PlugIn Manager
 
 *************************************************************************/
 
@@ -35,6 +36,12 @@ History:
 #include "ModInfoManager.h"
 #include <IJobManager.h>
 #include <CryProfileMarker.h>
+
+//PLUGIN SDK INTEGRATION. THANKS TO HENDRIKP
+
+#include <IPluginManager_impl.h>
+
+//END INCLUDE PLUGIN SDK
 
 #if ENABLE_AUTO_TESTER 
 static CAutoTester s_autoTesterSingleton;
@@ -560,6 +567,9 @@ IGameRef CGameStartup::Init(SSystemInitParams &startupParams)
 
 	InlineInitializationProcessing("CGameStartup::Init LoadLocalizationData");
 
+	//Integration Plugin SDK
+	PluginManager::RememberStartupParams(startupParams);
+
 	IGameRef pOut;
 	if (pModArg && (*pModArg->GetValue() != 0) && (pSystem->IsMODValid(pModArg->GetValue())))
 	{
@@ -650,6 +660,10 @@ IGameRef CGameStartup::Init(SSystemInitParams &startupParams)
 #endif // CRY_UNIT_TESTING
 
 	GetISystem()->GetISystemEventDispatcher()->OnSystemEvent(ESYSTEM_EVENT_RANDOM_SEED, (UINT_PTR)gEnv->pTimer->GetAsyncTime().GetMicroSecondsAsInt64(), 0);
+
+//Integration Plugin SDK
+	PluginManager::InitPluginsLast();
+
 	return pOut;
 }
 

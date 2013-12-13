@@ -9,6 +9,7 @@ Crytek Source File.
   History:
   - 3:8:2004   11:26 : Created by Márcio Martins
   - 17:8:2005        : Modified - NickH: Factory registration moved to GameFactory.cpp
+  - 12:12:13	Implements PlugIn Manager
 
 *************************************************************************/
 #include "StdAfx.h"
@@ -182,6 +183,16 @@ Crytek Source File.
 #include <ILiveCreateHost.h>
 #include <SFunctor.h>
 
+//Integration Plugin SDK
+
+#include <IPluginManager_impl.h>
+
+//MY INCLUDES
+////////////////
+
+////////////////////////
+//END OF MY INCLUDES
+
 //#define GAME_DEBUG_MEM  // debug memory usage
 #undef  GAME_DEBUG_MEM
 
@@ -210,6 +221,13 @@ CGame *g_pGame = 0;
 SCVars *g_pGameCVars = 0;
 CGameActions *g_pGameActions = 0;
 CTacticalPointLanguageExtender g_tacticalPointLanguageExtender;
+
+//MY DECLARATIONS
+////////////////
+
+////////////////////////
+//END OF MY DECLARATIONS
+
 
 static CRevertibleConfigLoader s_gameModeCVars(96, 5120);	// 5k - needs to hold enough room for patched cvars as well as multiplayer.cfg
 static CRevertibleConfigLoader s_levelCVars(20, 1024);
@@ -893,6 +911,12 @@ bool CGame::Init(IGameFramework *pFramework)
 	RegisterConsoleCommands();
 	RegisterGameObjectEvents();
 
+	//Integration Plugin SDK
+
+	PluginManager::InitPluginManager();
+	PluginManager::InitPluginsBeforeFramework();
+
+
 	if (!gEnv->IsDedicated())
 	{
 		m_pUIManager = new CUIManager();
@@ -1392,6 +1416,10 @@ void CGame::RegisterGameFlowNodes()
 			pFactory = pFactory->m_pNext;
 		}
 	}
+
+	//Integration Plugin SDK
+
+	PluginManager::RegisterPluginFlownodes();
 }
 
 CRevertibleConfigLoader &CGame::GetGameModeCVars()
@@ -3206,6 +3234,9 @@ int CGame::Update(bool haveFocus, unsigned int updateFlags) PREFAST_SUPPRESS_WAR
 #ifndef NO_LIVECREATE
 	LiveCreateUpdate();
 #endif
+////MY CODE////
+
+////END MY CODE
 
 	return bRun ? 1 : 0;
 }
@@ -3316,6 +3347,9 @@ string CGame::InitMapReloading()
 	m_bReload = false;
 	levelFileName.clear();
 #endif
+///MY CODE////
+
+///END MY CODE///
 	return levelFileName;
 }
 
